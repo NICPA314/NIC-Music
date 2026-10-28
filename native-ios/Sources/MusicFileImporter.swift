@@ -2,29 +2,69 @@ import Foundation
 import AVFoundation
 import UIKit
 import CryptoKit
+import ImageIO
 
 // File-provider coordination and decoding must never block SwiftUI's main actor.
 actor MusicFileImporter {
     static let shared = MusicFileImporter()
 
+    struct StoredImage { let filename: String; let preview: Data }
+    nonisolated static func imagePreview(_ data: Data) -> Data {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return data }
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        if (properties?[kCGImagePropertyPixelWidth] as? Int ?? 0) <= 1024,
+           (properties?[kCGImagePropertyPixelHeight] as? Int ?? 0) <= 1024 { return data }
+        let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: 1024, kCGImageSourceCreateThumbnailWithTransform: true]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return data }
+        return UIImage(cgImage: image).jpegData(compressionQuality: 0.88) ?? data
+    }
+    func previewArtwork(_ data: Data) -> Data { Self.imagePreview(data) }
+    private func safe(_ component: String) -> String {
+        let invalid = CharacterSet(charactersIn: "/\\:?*<>|\"").union(.controlCharacters)
+        let value = component.components(separatedBy: invalid).joined(separator: "_").trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+        return String((value.isEmpty ? "未命名" : value).prefix(100))
+    }
+    func storeNamedImage(_ data: Data, location: [String], stem: String, in root: URL, replace: Bool = true) throws -> StoredImage {
+        let directory = location.map(safe).joined(separator: "/")
+        let target = root.appendingPathComponent(directory, isDirectory: true)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        if !replace, let existing = try FileManager.default.contentsOfDirectory(at: target, includingPropertiesForKeys: nil).first(where: { $0.deletingPathExtension().lastPathComponent.lowercased() == stem }) {
+            let bytes = try Data(contentsOf: existing)
+            return StoredImage(filename: directory + "/" + existing.lastPathComponent, preview: Self.imagePreview(bytes))
+        }
+        guard UIImage(data: data) != nil else { throw CocoaError(.fileReadCorruptFile) }
+        let bytes: Data, ext: String
+        if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) { bytes = data; ext = "png" }
+        else if data.starts(with: [0xFF, 0xD8, 0xFF]) { bytes = data; ext = "jpg" }
+        else { guard let converted = UIImage(data: data)?.pngData() else { throw CocoaError(.fileReadCorruptFile) }; bytes = converted; ext = "png" }
+        let filename = stem + "." + ext
+        try bytes.write(to: target.appendingPathComponent(filename), options: .atomic)
+        return StoredImage(filename: directory + "/" + filename, preview: Self.imagePreview(bytes))
+    }
+    func importNamedImage(_ source: URL, location: [String], stem: String, in root: URL) throws -> StoredImage {
+        let file = try copy(source, into: root.appendingPathComponent("ArtworkStaging"))
+        defer { try? FileManager.default.removeItem(at: file) }
+        return try storeNamedImage(Data(contentsOf: file), location: location, stem: stem, in: root)
+    }
+    func removeOtherImageVariants(keeping filename: String, in root: URL) {
+        let keep = root.appendingPathComponent(filename)
+        guard let siblings = try? FileManager.default.contentsOfDirectory(at: keep.deletingLastPathComponent(), includingPropertiesForKeys: nil) else { return }
+        for file in siblings where file != keep && file.deletingPathExtension().lastPathComponent == keep.deletingPathExtension().lastPathComponent && ["png", "jpg", "jpeg", "heic", "webp"].contains(file.pathExtension.lowercased()) {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
     func artistPortrait(beside audio: URL, within root: URL) -> Data? {
         let boundary = root.standardizedFileURL.path
-        var directory = audio.deletingLastPathComponent().standardizedFileURL
-        var directories: [URL] = []
-        while directory.path == boundary || directory.path.hasPrefix(boundary + "/") {
-            directories.append(directory)
-            if directory.path == boundary { break }
-            directory.deleteLastPathComponent()
-        }
-        // Prefer the artist's parent directory to an album's local folder image.
-        let candidates = Array(directories.dropFirst()) + Array(directories.prefix(1))
-        for directory in candidates {
-            guard let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { continue }
+        let directory = audio.deletingLastPathComponent().deletingLastPathComponent().standardizedFileURL
+        // Artist/folder.xxx belongs one level above Album/audio. Never use an
+        // album-local folder image as the artist portrait or leave the granted root.
+        guard directory.path == boundary || directory.path.hasPrefix(boundary + "/") else { return nil }
+            guard let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return nil }
             for ext in ["jpg", "jpeg", "png", "heic", "webp"] {
                 if let file = files.first(where: { $0.deletingPathExtension().lastPathComponent.lowercased() == "folder" && $0.pathExtension.lowercased() == ext }),
                    let data = try? Data(contentsOf: file), UIImage(data: data) != nil { return data }
             }
-        }
         return nil
     }
 
@@ -46,11 +86,6 @@ actor MusicFileImporter {
     }
 
     func place(_ stagedFilename: String, in folder: URL, location: [String], originalName: String) throws -> String {
-        func safe(_ component: String) -> String {
-            let invalid = CharacterSet(charactersIn: "/\\:?*<>|\"").union(.controlCharacters)
-            let value = component.components(separatedBy: invalid).joined(separator: "_").trimmingCharacters(in: CharacterSet(charactersIn: ". "))
-            return String((value.isEmpty ? "未命名" : value).prefix(100))
-        }
         let relative = location.map(safe).joined(separator: "/")
         let directory = folder.appendingPathComponent(relative, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -122,7 +157,6 @@ actor MusicFileImporter {
                         if let (file, poster) = try? await importCover(video, video: true, into: folder) {
                             videoCopy = file
                             if let preview = UIImage(data: poster) { videoAspectRatio = Double(preview.size.width / preview.size.height) }
-                            if artwork == nil { artwork = poster }
                         }
                         break
                     }

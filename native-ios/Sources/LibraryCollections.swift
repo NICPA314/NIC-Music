@@ -44,6 +44,8 @@ struct ArtistPortrait: View {
 
 struct ArtistDirectoryView: View {
     @Environment(MusicLibrary.self) private var library
+    private struct PortraitRequest: Identifiable { let id: String }
+    @State private var portraitRequest: PortraitRequest?
     private var artists: [String] {
         Array(Set(library.librarySongs.flatMap { [$0.artist, $0.albumArtist ?? $0.artist] })).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
@@ -63,7 +65,14 @@ struct ArtistDirectoryView: View {
                         Text("\(tracks.count) 首歌曲").font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                     }.padding(.vertical, 7)
                 }.listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                    .contextMenu { Button("自定头像", systemImage: "person.crop.circle.badge.plus") { portraitRequest = PortraitRequest(id: artist) } }
             }.listStyle(.plain)
+            .sheet(item: $portraitRequest) { request in
+                DocumentImportPicker(types: [.image]) { urls in
+                    portraitRequest = nil
+                    if let url = urls.first { Task { await library.setArtistArtwork(url, artist: request.id) } }
+                }
+            }
         }
     }
 }

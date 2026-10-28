@@ -3,6 +3,7 @@ import SwiftUI
 struct AlbumDetailView: View {
     @Environment(MusicLibrary.self) private var library
     let albumKey: String
+    @State private var chooseCover = false
     private var songs: [Song] {
         library.librarySongs.filter { $0.albumKey == albumKey }.sorted {
             if $0.discNumber != $1.discNumber { return ($0.discNumber ?? 1) < ($1.discNumber ?? 1) }
@@ -15,12 +16,14 @@ struct AlbumDetailView: View {
             if let first = songs.first {
                 VStack(spacing: 18) {
                     Cover(song: first).aspectRatio(1, contentMode: .fit).frame(maxWidth: 280).shadow(color: .black.opacity(0.12), radius: 14, y: 6)
+                        .contextMenu { Button("自定封面", systemImage: "photo") { chooseCover = true } }
                     VStack(spacing: 5) {
                         Text(first.albumTitle).font(.title2.bold()).multilineTextAlignment(.center)
                         NavigationLink(first.albumArtist ?? first.artist) { ArtistDetailView(artist: first.albumArtist ?? first.artist) }.font(.title3)
                         Text([first.genre, first.releaseDate].compactMap { $0 }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
                     }
                     Button("播放", systemImage: "play.fill") { library.play(first, queue: songs) }.buttonStyle(ClearGlassButtonStyle())
+                    Button("自定封面", systemImage: "photo") { chooseCover = true }.font(.subheadline).disabled(library.importingAttachment)
                     VStack(spacing: 0) {
                         ForEach(songs) { song in
                             Button { library.play(song, queue: songs) } label: {
@@ -44,6 +47,12 @@ struct AlbumDetailView: View {
                 }.padding(24)
             }
         }.navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $chooseCover) {
+            DocumentImportPicker(types: [.image]) { urls in
+                chooseCover = false
+                if let url = urls.first { Task { await library.setAlbumArtwork(url, albumKey: albumKey) } }
+            }
+        }
     }
 }
 
@@ -62,7 +71,7 @@ struct ArtistDetailView: View {
                     if let data = library.artistArtwork[artist], let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill() }
                     else { Circle().fill(.quaternary).overlay { Image(systemName: "person.fill").font(.system(size: 70)).foregroundStyle(.secondary) } }
                 }.frame(width: 180, height: 180).clipShape(Circle())
-                Button("设置艺人封面") { importing = true }.font(.subheadline)
+                Button("自定头像") { importing = true }.font(.subheadline)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], spacing: 22) {
                     ForEach(albums) { album in
                         NavigationLink { AlbumDetailView(albumKey: album.id) } label: {

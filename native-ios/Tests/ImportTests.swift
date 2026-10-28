@@ -1,6 +1,7 @@
 import XCTest
 import AVFoundation
 import MediaPlayer
+import UIKit
 @testable import NICMusic
 
 @MainActor final class ImportTests: XCTestCase {
@@ -149,10 +150,10 @@ import MediaPlayer
         XCTAssertTrue(playable)
         let image = Bundle(for: Self.self).url(forResource: "cover", withExtension: "png", subdirectory: "Fixtures")!
         await library.addCover(image, video: false, to: id)
-        XCTAssertNil(library.songs.first?.videoFilename)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: library.folder.appendingPathComponent(filename).path))
+        XCTAssertEqual(library.songs.first?.videoFilename, filename)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: library.folder.appendingPathComponent(filename).path))
         XCTAssertEqual(library.songs.first?.title, "Metadata Title")
-        XCTAssertNil(library.songs.first?.videoAspectRatio)
+        XCTAssertEqual(library.songs.first?.videoAspectRatio, 1)
     }
     func testTallVideoWinsOverSquareAndUsesLockScreenRatio() async throws {
         _ = try copy(fixture("01. Wrong Filename"), to: "Input/01.m4a")
@@ -179,6 +180,7 @@ import MediaPlayer
         try FileManager.default.removeItem(at: root.appendingPathComponent("Input"))
         let reloaded = MusicLibrary(folder: library.folder)
         XCTAssertEqual(reloaded.artistArtwork["Test Artist"], try Data(contentsOf: photo))
+        XCTAssertEqual(try Data(contentsOf: library.folder.appendingPathComponent("Albums/Test Artist/folder.png")), try Data(contentsOf: photo))
     }
     func testPlaylistCustomCoverIsCopiedPersistedAndReset() async throws {
         library.createPlaylist("My Playlist")
@@ -207,5 +209,40 @@ import MediaPlayer
         library.togglePlaylistPin(id)
         XCTAssertFalse(library.playlists.contains { $0.pinned == true })
         XCTAssertEqual(library.playlists.count, 2)
+    }
+    func testCustomAlbumCoverUsesStandardNameAndAppliesToLaterTracks() async throws {
+        await library.importSongs([fixture("01. Wrong Filename"), fixture("02. Second")])
+        let album = try XCTUnwrap(library.songs.first?.albumKey)
+        let photo = Bundle(for: Self.self).url(forResource: "cover", withExtension: "png", subdirectory: "Fixtures")!
+        await library.setAlbumArtwork(photo, albumKey: album)
+        await library.importSongs([fixture("03. Third")])
+        XCTAssertEqual(library.songs.count, 3)
+        for song in library.songs {
+            XCTAssertEqual(URL(fileURLWithPath: try XCTUnwrap(song.artworkFilename)).lastPathComponent, "cover.png")
+            XCTAssertEqual(song.artwork, try Data(contentsOf: photo))
+        }
+        let reloaded = MusicLibrary(folder: library.folder)
+        XCTAssertTrue(reloaded.songs.allSatisfy { $0.customArtwork == true })
+    }
+    func testAlbumLocalFolderImageIsNotUsedAsArtistPortrait() async throws {
+        _ = try copy(fixture("02. Second"), to: "Input/Artist/Album/02.m4a")
+        let photo = Bundle(for: Self.self).url(forResource: "cover", withExtension: "png", subdirectory: "Fixtures")!
+        _ = try copy(photo, to: "Input/Artist/Album/folder.png")
+        await library.importDirectory(root.appendingPathComponent("Input"))
+        XCTAssertNil(library.artistArtwork["Test Artist"])
+        XCTAssertNil(library.songs.first?.artwork)
+    }
+    func testCustomArtistPortraitKeepsOriginalWithBoundedPreview() async throws {
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 1800, height: 1800), format: format).image { context in
+            UIColor.systemPink.setFill(); context.fill(CGRect(x: 0, y: 0, width: 1800, height: 1800))
+        }
+        let data = try XCTUnwrap(image.pngData())
+        let source = root.appendingPathComponent("portrait.png")
+        try data.write(to: source)
+        await library.setArtistArtwork(source, artist: "Test Artist")
+        let preview = try XCTUnwrap(library.artistArtwork["Test Artist"].flatMap { UIImage(data: $0) })
+        XCTAssertLessThanOrEqual(preview.size.width, 1024)
+        XCTAssertEqual(try Data(contentsOf: library.folder.appendingPathComponent("Albums/Test Artist/folder.png")), data)
     }
 }
