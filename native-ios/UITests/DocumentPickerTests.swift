@@ -62,7 +62,7 @@ final class DocumentPickerTests: XCTestCase {
         screenshot.name = "folder-import-three-tracks"; screenshot.lifetime = .keepAlways; add(screenshot)
         let search = app.tabBars.buttons["搜索"]
         XCTAssertTrue(search.exists)
-        XCTAssertFalse(app.tabBars.firstMatch.exists, "Only the custom clear-glass dock should be visible")
+        XCTAssertTrue(app.tabBars.firstMatch.exists, "Use the native system tab bar")
         XCTAssertGreaterThan(search.frame.midX, app.frame.width * 0.8)
         search.tap()
         let field = app.textFields["music-search-field"]
