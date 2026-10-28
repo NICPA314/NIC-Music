@@ -12,7 +12,7 @@ let time = 0, playing = false, stamp = performance.now(), last = stamp;
 let original: LyricLine[] = [], translation = true, pronunciation = true;
 const send = (payload: object) => (window as any).webkit?.messageHandlers?.lyrics?.postMessage(payload);
 player.addEventListener('line-click', (event: Event) => {
-  const line = original[(event as LyricLineMouseEvent).lineIndex];
+  const line = (event as LyricLineMouseEvent).line.getLine();
   if (line) send({ event: 'seek', time: line.words[0]?.startTime ?? line.startTime });
 });
 let ambient: BackgroundRender<MeshGradientRenderer> | undefined;

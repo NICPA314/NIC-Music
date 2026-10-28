@@ -348,7 +348,7 @@ struct Song: Identifiable, Codable, Equatable {
     }
     func play(_ song: Song, queue: [Song]? = nil) {
         do {
-            if let queue { queueIDs = queue.map(\.id) }
+            if let queue { queueIDs = queue.map(\.id); randomRemaining = [] }
             else if !queueIDs.contains(song.id) {
                 if let id = song.storagePlaylistID, let playlist = playlists.first(where: { $0.id == id }) { queueIDs = playlist.songIDs }
                 else { queueIDs = librarySongs.map(\.id) }
