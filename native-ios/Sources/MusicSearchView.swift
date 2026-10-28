@@ -14,6 +14,12 @@ struct MusicSearchView: View {
             .filter { $0.localizedCaseInsensitiveContains(term) }.sorted()
     }
     var body: some View {
+        VStack(spacing: 0) {
+            searchField
+            searchContent
+        }
+    }
+    @ViewBuilder private var searchContent: some View {
         Group {
             if term.isEmpty { categories }
             else if tracks.isEmpty && albums.isEmpty && artists.isEmpty { ContentUnavailableView.search(text: term) }
@@ -35,13 +41,14 @@ struct MusicSearchView: View {
                 }.listStyle(.plain)
             }
         }
-        .safeAreaInset(edge: .top) {
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    private var searchField: some View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("歌曲、专辑、歌手", text: $query).submitLabel(.search).accessibilityIdentifier("music-search-field")
                 if !query.isEmpty { Button("清除", systemImage: "xmark.circle.fill") { query = "" }.labelStyle(.iconOnly).foregroundStyle(.secondary) }
             }.padding(16).glassEffect(.clear.interactive(), in: .capsule).padding(.horizontal, 20).padding(.bottom, 12)
-        }
     }
     private var categories: some View {
         ScrollView {

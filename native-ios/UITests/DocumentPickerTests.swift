@@ -47,8 +47,11 @@ final class DocumentPickerTests: XCTestCase {
         search.tap()
         let field = app.textFields["music-search-field"]
         XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText("Second Track")
+        XCTAssertEqual(field.value as? String, "Second Track", "Typing must keep focus when category cards become search results")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Second Track")).firstMatch.exists)
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Third Track")).firstMatch.exists)
+        let searchImage = XCTAttachment(screenshot: app.screenshot())
+        searchImage.name = "search-filtered-results"; searchImage.lifetime = .keepAlways; add(searchImage)
         app.buttons["library-tab"].tap()
         let back = app.navigationBars.buttons["资料库"].firstMatch
         if back.exists { back.tap() }

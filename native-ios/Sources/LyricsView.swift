@@ -59,7 +59,7 @@ struct LyricsView: UIViewRepresentable {
         var onError: ((String)->Void)?
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let body = message.body as? [String:Any] else { return }
-            if body["event"] as? String == "ready" { ready = true; sync() }
+            if body["event"] as? String == "ready" { ImportDiagnostics.record("AMLL page ready"); ready = true; sync() }
             if body["event"] as? String == "backgroundReady" { ImportDiagnostics.record("AMLL background ready") }
             if body["event"] as? String == "error" { onError?(body["message"] as? String ?? "歌词读取失败") }
             if body["event"] as? String == "loaded" { onCapabilities?(body["translation"] as? Bool ?? false, body["pronunciation"] as? Bool ?? false) }

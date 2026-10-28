@@ -74,6 +74,8 @@ jobs:
           DEVICE=$(xcrun simctl list devices booted -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for v in d["devices"].values() for x in v if x["state"] == "Booted"))')
           xcrun simctl ui "$DEVICE" appearance light
           xcodebuild test -project NICMusic.xcodeproj -scheme NICMusic -destination "platform=iOS Simulator,id=$DEVICE" -parallel-testing-enabled NO -derivedDataPath build/simulator -resultBundlePath build/ImportTests.xcresult CODE_SIGNING_ALLOWED=NO > build-tests.log 2>&1 || { tail -150 build-tests.log; exit 1; }
+          APP_DATA=$(xcrun simctl get_app_container "$DEVICE" app.nicpa.amllplayer.test data)
+          grep -q 'AMLL background ready' "$APP_DATA/Library/Caches/ImportDiagnostics.log"
           xcrun simctl launch "$DEVICE" app.nicpa.amllplayer.test
           sleep 3
           xcrun simctl io "$DEVICE" screenshot build/library-imported.png
