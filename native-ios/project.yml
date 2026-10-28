@@ -13,10 +13,11 @@ targets:
   NICMusic:
     type: application
     platform: iOS
-    sources: [Sources]
-    resources:
+    sources:
+      - path: Sources
       - path: LyricsWeb/dist
         type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.nicpa.amllplayer.test
