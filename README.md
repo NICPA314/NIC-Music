@@ -1,55 +1,34 @@
-<div align=center>
+# NIC Music
 
-# AMLL Player
+原生 iOS 本地音乐播放器。用 SwiftUI 构建资料库和播放界面，以 AMLL 呈现逐字歌词，让自己的音乐文件、专辑和播放列表留在自己的设备里。
 
-English / [简体中文](./README-CN.md)
+> 当前为开发测试版，最低支持 iOS 26.0。Apple Music 风格是界面参考；本项目不提供 Apple Music 账号登录、订阅曲库或流媒体服务。
 
-An independent lyrics page player that obtains audio playback information through local music files/WebSocket Server.
+## 功能
 
-</div>
+- **元数据导入**：歌名、艺人、专辑等信息读取自音频标签，不拿文件名代替歌名；提供导入进度及逐项失败反馈。
+- **文件夹与专辑**：递归识别子文件夹，优先沿用文件夹的专辑组织；平铺音乐按专辑和专辑艺人元数据分类。后续补入同专辑歌曲时复用已有目录。
+- **独立播放列表**：每个播放列表保存自己的音频副本。有文件名编号时按编号排序，否则按艺人、专辑日期、碟号和曲序排序。
+- **应用内副本**：音频复制到应用的 `Documents/Music`，按专辑或播放列表存放，保留原始音频字节。只有确认导入完成且可播放后，才应清理源文件。
+- **封面**：优先内嵌图片，其次同目录 `cover` 图片；支持手动静态／视频封面，以及文件夹中的指定动态封面文件。
+- **逐字歌词**：离线 AMLL TTML 与 LRC，支持文件内已有的翻译和发音显示开关，不包含自动翻译生成服务。
+- **专辑信息**：展示实际可读取的艺人、发行日期、厂牌、版权和音质；艺人封面可单独设置。
+- **原生界面**：资料库、专辑、艺人、搜索、悬浮播放器、播放队列和系统 Liquid Glass 控件。图标采用经典红色与薄玻璃音符。
 
-## List of functions/features：
+## 测试安装包
 
-- Communicate with any client that implements the AMLL WS Protocol, synchronize the progress of the playback information, and get the corresponding lyrics for playback display
-- Support reading local audio files for playback, or loading local lyrics files
-- Support loading various lyric formats
-- High performance – no software issues that affect the display of lyrics
-- Expected support for playback state transfer protocols：[SMTC (Windows)](https://learn.microsoft.com/en-us/uwp/api/windows.media.systemmediatransportcontrols?view=winrt-26100) / [MPRIS (Linux/XDG)](https://www.freedesktop.org/wiki/Specifications/mpris-spec/) / [MPNowPlayingInfoCenter (macOS)](https://developer.apple.com/documentation/mediaplayer/mpnowplayinginfocenter)
+在 [`Native iOS IPA` GitHub Actions](https://github.com/NICPA314/NIC-Music/actions/workflows/native-ios.yml) 的成功构建中下载 `NIC-Music-iOS` artifact。内含未签名 IPA、SHA256 和模拟器截图；IPA 需要自行签名后安装。
 
-## Install and use
+构建检查包括设备与模拟器编译、导入／元数据／专辑归类／独立副本／播放测试，以及系统文件选择器界面测试。具体状态以对应构建记录为准，不能将编译通过视为真机功能验证。
 
-Since the player is still compatible, the development build can only be downloaded through [Github Action](https://github.com/amll-dev/amll-player/actions/workflows/build-player.yaml), and the official version will be released in the future.
+## 开发
 
-## Why is there this？
+原生工程位于 [`native-ios/`](native-ios/README.md)，使用 Xcode 26+、XcodeGen 和 Node.js。离线歌词资源构建及 Xcode 工程生成步骤见该目录的说明。
 
-The lyrics player is equivalent to software like external subtitles, and the lyrics are played in an environment independent of the plug-in environment.
+这是持续开发中的测试项目。真机文件提供器、后台播放、歌词同步及不同系统上的视觉表现仍需设备验证；iOS 27 尚未完成真机验证。当前没有在线音乐服务、自动联网补全标签、播放列表手动排序或随机／循环模式。
 
-After the author's performance test, it is found that embedding it in the form of a plug-in on the playback page will cause frame drops and uncertain stuttering due to the browser framework problems of the plug-in running environment.
+## 来源与许可证
 
-Therefore, the author decided to separate the playback page into a separate desktop program to improve the playback performance and effect, while the original plug-in was responsible for transmitting the playback information and status to the lyric player.
+基于 [amll-dev/amll-player](https://github.com/amll-dev/amll-player) 开发，保留上游桌面工程和 AMLL 相关实现。原始说明保存在 [`docs/upstream/`](docs/upstream/README-CN.md)。感谢 AMLL 及其依赖项目的贡献者。
 
-So if you also have a little stuttering, you can try using this lyric player, and the performance should be improved.
-
-
-### Building the AMLL Player desktop application
-
-```bash
-cd packages/player
-pnpm tauri build          # Production build
-pnpm tauri dev            # Development mode
-```
-
-### Acknowledgements
-
--   [woshizja/sound-processor](https://github.com/woshizja/sound-processor)
--   [FFmpeg](http://ffmpeg.org/)
--   And many other frameworks and libraries used by AMLL, thank you very much!
-
-### Special Thanks
-
-<div align="center">
-<image src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg"></image>
-<div>
-Thanks to <a href=https://jb.gg/OpenSourceSupport>JetBrains</a> for their development tools that provide great support to the AMLL project
-</div>
-</div>
+保留仓库原有 [LICENSE](LICENSE) 及来源声明。上游根许可证为 AGPL-3.0，而原 `package.json` 的许可证字段为 GPL-3.0；此处保留原信息，不自行替换上游条款。各依赖遵循各自许可证。

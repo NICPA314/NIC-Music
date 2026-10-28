@@ -116,6 +116,7 @@ struct Song: Identifiable, Codable, Equatable {
     func importSongs(_ urls: [URL], companions: Bool = false, playlistID: UUID? = nil, folderRoot: URL? = nil) async {
         guard !importing, !urls.isEmpty else { return }
         importing = true
+        NSLog("NICImport: starting coordinated import of %ld file(s)", urls.count)
         importSummary = nil
         defer { importing = false; importProgress = "" }
         var imported = 0
@@ -185,6 +186,7 @@ struct Song: Identifiable, Codable, Equatable {
             savePlaylists()
         }
         importSummary = "已导入 \(imported) 首歌曲，跳过 \(skipped) 首重复歌曲" + (failures.isEmpty ? "。" : "，\(failures.count) 个文件失败。\n" + failures.joined(separator: "\n"))
+        NSLog("NICImport: completed %ld, skipped %ld, failed %ld", imported, skipped, failures.count)
     }
     func createPlaylist(_ name: String) {
         let title = name.trimmingCharacters(in: .whitespacesAndNewlines)

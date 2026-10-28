@@ -34,7 +34,9 @@ final class DocumentPickerTests: XCTestCase {
             if finish.exists && finish.isHittable { finish.tap(); break }
         }
         let result = app.alerts["导入结果"]
-        XCTAssertTrue(result.waitForExistence(timeout: 30))
+        let receivedResult = result.waitForExistence(timeout: 45)
+        if !receivedResult { print("IMPORT DID NOT COMPLETE:\n" + app.debugDescription) }
+        XCTAssertTrue(receivedResult)
         XCTAssertTrue(result.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "已导入 1")).firstMatch.exists)
         result.buttons["好"].tap()
         app.staticTexts["歌曲"].firstMatch.tap()

@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 struct LibraryRoot: View {
     @Environment(MusicLibrary.self) private var library
     @State private var showImporter = false
+    @State private var pendingImport: [URL] = []
     @State private var importFolder = false
     @State private var importPlaylistID: UUID?
     @State private var newPlaylist = false
@@ -38,7 +39,7 @@ struct LibraryRoot: View {
                 NavigationStack {
                     Form {
                         Section("音乐") { importMenu; LabeledContent("歌曲", value: "\(library.librarySongs.count)"); Text("导入文件夹可同时读取专辑封面和同名 TTML／LRC 歌词。").font(.footnote).foregroundStyle(.secondary) }
-                        Section("关于") { LabeledContent("NIC Music", value: "0.2.0"); Link("AMLL Player 开源项目", destination: URL(string:"https://github.com/amll-dev/amll-player")!); Link("源码与许可证", destination: URL(string:"https://github.com/NICPA314/AMLL-Player-iOS")!) }
+                        Section("关于") { LabeledContent("NIC Music", value: "0.2.0"); Link("AMLL Player 开源项目", destination: URL(string:"https://github.com/amll-dev/amll-player")!); Link("源码与许可证", destination: URL(string:"https://github.com/NICPA314/NIC-Music")!) }
                     }.navigationTitle("设置")
                 }
             }
@@ -56,15 +57,10 @@ struct LibraryRoot: View {
             }
         }
         .sheet(item: $presented) { _ in NowPlayingView().environment(library) }
-        .sheet(isPresented: $showImporter) {
-            DocumentImportPicker(types: importFolder ? [.folder] : [.audio], multiple: !importFolder, asCopy: !importFolder) { urls in
+        .sheet(isPresented: $showImporter, onDismiss: finishImportSelection) {
+            DocumentImportPicker(types: importFolder ? [.folder] : [.audio], multiple: !importFolder) { urls in
+                pendingImport = urls
                 showImporter = false
-                let folder = importFolder
-                let playlistID = importPlaylistID
-                Task {
-                    if folder, let url = urls.first { await library.importDirectory(url, playlistID: playlistID) }
-                    else { await library.importSongs(urls, playlistID: playlistID) }
-                }
             }
         }
         .safeAreaInset(edge: .top) { if library.importing { HStack { ProgressView(); Text(library.importProgress).font(.footnote).lineLimit(2) }.padding(12).frame(maxWidth: .infinity).background(.regularMaterial).accessibilityIdentifier("import-progress") } }
@@ -79,6 +75,17 @@ struct LibraryRoot: View {
         } label: { Label("导入音乐", systemImage: "plus") }.disabled(library.importing).accessibilityIdentifier("import-music")
     }
     private func startImport(folder: Bool, playlistID: UUID? = nil) { importFolder = folder; importPlaylistID = playlistID; showImporter = true }
+    private func finishImportSelection() {
+        let urls = pendingImport
+        pendingImport = []
+        guard !urls.isEmpty else { return }
+        let folder = importFolder
+        let playlistID = importPlaylistID
+        Task {
+            if folder, let url = urls.first { await library.importDirectory(url, playlistID: playlistID) }
+            else { await library.importSongs(urls, playlistID: playlistID) }
+        }
+    }
     private var albums: [AlbumGroup] {
         Dictionary(grouping: library.librarySongs, by: \.albumKey).map { AlbumGroup(id: $0.key, songs: $0.value) }.sorted { $0.first.albumTitle < $1.first.albumTitle }
     }

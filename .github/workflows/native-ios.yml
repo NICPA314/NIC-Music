@@ -82,6 +82,10 @@ jobs:
           if [ -d build/ImportTests.xcresult ]; then
             xcrun xcresulttool export attachments --path build/ImportTests.xcresult --output-path build/test-attachments || true
           fi
+          DEVICE=$(xcrun simctl list devices booted -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((x["udid"] for v in d["devices"].values() for x in v if x["state"] == "Booted"), ""))')
+          if [ -n "$DEVICE" ]; then
+            xcrun simctl spawn "$DEVICE" log show --last 10m --style compact --predicate 'process == "NICMusic" OR (process == "com.apple.DocumentManagerUICore.DocumentManagerService" AND messageType == error)' > build-import-runtime.log 2>&1 || true
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: NIC-Music-iOS
