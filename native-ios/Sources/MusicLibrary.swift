@@ -144,6 +144,8 @@ struct Song: Identifiable, Codable, Equatable {
                 let location: [String]
                 if let playlistID, let playlist = playlists.first(where: { $0.id == playlistID }) {
                     location = ["Playlists", playlist.name + "-" + playlistID.uuidString.prefix(8)]
+                } else if let stored = librarySongs.first(where: { $0.albumKey == song.albumKey && $0.filename.hasPrefix("Albums/") }) {
+                    location = stored.filename.split(separator: "/").dropLast().map(String.init)
                 } else { location = ["Albums", song.albumArtist ?? song.artist, song.albumTitle] }
                 song.filename = try await MusicFileImporter.shared.place(song.filename, in: folder, location: location, originalName: url.lastPathComponent)
                 copied = song

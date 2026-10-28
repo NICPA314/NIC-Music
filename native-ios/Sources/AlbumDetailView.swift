@@ -61,7 +61,7 @@ struct ArtistDetailView: View {
                 Group {
                     if let data = library.artistArtwork[artist], let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill() }
                     else { Circle().fill(.quaternary).overlay { Image(systemName: "person.fill").font(.system(size: 70)).foregroundStyle(.secondary) } }
-                .frame(width: 180, height: 180).clipShape(Circle())
+                }.frame(width: 180, height: 180).clipShape(Circle())
                 Button("设置艺人封面") { importing = true }.font(.subheadline)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], spacing: 22) {
                     ForEach(albums) { album in

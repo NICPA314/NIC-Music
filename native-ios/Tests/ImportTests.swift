@@ -76,6 +76,17 @@ import AVFoundation
         XCTAssertEqual(second.artwork, try Data(contentsOf: image))
         XCTAssertNotEqual(first.artwork, second.artwork, "Embedded cover must take precedence")
     }
+    func testLaterSongReusesExistingAlbumDirectory() async throws {
+        let first = try copy(fixture("01. Wrong Filename"), to: "First/Artist/Folder Album/01.m4a")
+        await library.importDirectory(root.appendingPathComponent("First"))
+        let directory = try XCTUnwrap(library.songs.first).filename.split(separator: "/").dropLast().joined(separator: "/")
+        let second = try copy(fixture("02. Second"), to: "Later/02.m4a")
+        await library.importSongs([second])
+        XCTAssertEqual(library.songs.count, 2)
+        XCTAssertEqual(Set(library.songs.map(\.albumKey)).count, 1)
+        XCTAssertEqual(library.songs.last?.filename.split(separator: "/").dropLast().joined(separator: "/"), directory)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: first.path), "Import must preserve the source")
+    }
     func testPlaylistsUseIndependentCopiesAndNumericFilenameOrder() async throws {
         library.createPlaylist("One"); library.createPlaylist("Two")
         let first = library.playlists[0].id, second = library.playlists[1].id
