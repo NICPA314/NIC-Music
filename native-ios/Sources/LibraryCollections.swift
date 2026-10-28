@@ -50,18 +50,20 @@ struct ArtistDirectoryView: View {
     var body: some View {
         if artists.isEmpty { ContentUnavailableView("暂无歌手", systemImage: "person.crop.circle") }
         else {
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], spacing: 26) {
-                    ForEach(artists, id: \.self) { artist in
-                        NavigationLink { ArtistDetailView(artist: artist) } label: {
-                            VStack(spacing: 12) {
-                                ArtistPortrait(data: library.artistArtwork[artist]).aspectRatio(1, contentMode: .fit)
-                                Text(artist).font(.headline).foregroundStyle(.primary).lineLimit(2).multilineTextAlignment(.center)
-                            }
-                        }.buttonStyle(.plain)
-                    }
-                }.padding(22)
-            }
+            List(artists, id: \.self) { artist in
+                let tracks = library.librarySongs.filter { $0.artist == artist || $0.albumArtist == artist }
+                NavigationLink { ArtistDetailView(artist: artist) } label: {
+                    HStack(spacing: 14) {
+                        ArtistPortrait(data: library.artistArtwork[artist]).frame(width: 60, height: 60)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(artist).font(.title3).foregroundStyle(.primary).lineLimit(1)
+                            Text("\(Set(tracks.map(\.albumKey)).count) 张专辑").font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        Text("\(tracks.count) 首歌曲").font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                    }.padding(.vertical, 7)
+                }.listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+            }.listStyle(.plain)
         }
     }
 }
