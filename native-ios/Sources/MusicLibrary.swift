@@ -385,6 +385,7 @@ struct Song: Identifiable, Codable, Equatable {
         if playbackMode == .random, step > 0 {
             if randomRemaining.isEmpty { randomRemaining = queue.map(\.id).filter { $0 != currentID }.shuffled() }
             if let id = randomRemaining.popLast(), let song = songs.first(where: { $0.id == id }) { play(song) }
+            else { pause() }
             return
         }
  let ordered = queue; guard let i = ordered.firstIndex(where: { $0.id == currentID }), !ordered.isEmpty else { return }; play(ordered[(i+step+ordered.count)%ordered.count]) }

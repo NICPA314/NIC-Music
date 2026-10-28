@@ -252,4 +252,36 @@ import UIKit
         XCTAssertLessThanOrEqual(preview.size.width, 1024)
         XCTAssertEqual(try Data(contentsOf: library.folder.appendingPathComponent("Albums/Test Artist/folder.png")), data)
     }
+    func testRandomQueueVisitsEachTrackAndSingleSongStops() async throws {
+        await library.importSongs([fixture("01. Wrong Filename"), fixture("02. Second"), fixture("03. Third")])
+        let songs = library.librarySongs
+        XCTAssertEqual(songs.count, 3)
+        let first = try XCTUnwrap(songs.first)
+        library.play(first, queue: songs)
+        library.changePlaybackMode(.random)
+        var visited: Set<UUID> = [first.id]
+        for _ in 0..<2 {
+            library.next(1)
+            let id = try XCTUnwrap(library.currentID)
+            XCTAssertFalse(visited.contains(id))
+            visited.insert(id)
+        }
+        XCTAssertEqual(visited.count, 3)
+        library.play(first, queue: [first])
+        library.next(1)
+        XCTAssertFalse(library.playing)
+        XCTAssertEqual(library.currentID, first.id)
+    }
+    func testAppInboxImportsAlbumWithoutExternalPicker() async throws {
+        let source = try copy(fixture("01. Wrong Filename"), to: "待导入/Artist/Album/01.m4a")
+        await library.importInboxContents()
+        let song = try XCTUnwrap(library.librarySongs.first)
+        XCTAssertEqual(song.title, "Metadata Title")
+        XCTAssertEqual(song.albumTitle, "Album")
+        try FileManager.default.removeItem(at: source.deletingLastPathComponent())
+        XCTAssertTrue(FileManager.default.fileExists(atPath: library.folder.appendingPathComponent(song.filename).path))
+        library.play(song)
+        XCTAssertTrue(library.playing, library.error ?? "")
+    }
+
 }
