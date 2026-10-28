@@ -30,7 +30,7 @@ xcodegen generate
 xcodebuild build -project NICMusic.xcodeproj -scheme NICMusic -configuration Release -destination 'generic/platform=iOS' -derivedDataPath build/device CODE_SIGNING_ALLOWED=NO
 ```
 
-Use the `Native iOS IPA` workflow on branch `native-ios` (manual or native-source push). It builds device and simulator targets, runs import/playback unit tests and a system document-picker UI test, and packages an unsigned IPA. Test bundle ID: `app.nicpa.amllplayer.test`.
+Use the `Native iOS IPA` workflow on branch `native-ios` (manual or native-source push). It builds device and simulator targets, runs import/playback unit tests and system document-picker UI tests, then publishes an unsigned `.ipa` directly as a GitHub prerelease attachment only after validation succeeds. Download the IPA from Releases or the workflow summary without extracting an artifact ZIP. Each run has a separate tag targeting the built commit; screenshots, test results and logs remain separate Actions artifacts. Test bundle ID: `app.nicpa.amllplayer.test`.
 
 Test fixtures are original synthetic ALAC tones and solid colors, generated with `python3 Tests/make_fixtures.py`. User audio, lyrics and UI references are not uploaded or bundled. Local Web QA also exercises TTML rendering, seek, LRC, translation and pronunciation controls.
 

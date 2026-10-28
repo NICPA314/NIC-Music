@@ -23,7 +23,9 @@
 
 ## 测试安装包
 
-在 [`Native iOS IPA` GitHub Actions](https://github.com/NICPA314/NIC-Music/actions/workflows/native-ios.yml) 的成功构建中下载 `NIC-Music-iOS` artifact。内含未签名 IPA、SHA256 和模拟器截图；IPA 需要自行签名后安装。
+在 [GitHub Releases](https://github.com/NICPA314/NIC-Music/releases) 中直接下载 `NIC-Music-版本-build构建号.ipa` 附件，无需解压。IPA 未签名，需要自行签名后安装；旁边的 `SHA256.txt` 可用于校验文件。
+
+[`Native iOS IPA` GitHub Actions](https://github.com/NICPA314/NIC-Music/actions/workflows/native-ios.yml) 仅在构建和自动化测试通过后发布测试包，运行摘要提供 IPA 直达链接。模拟器截图、测试结果与构建日志单独保留在 Actions 中。多端桌面构建工作流已移除。
 
 构建检查包括设备与模拟器编译、导入／元数据／专辑归类／独立副本／播放测试，以及系统文件选择器界面测试。具体状态以对应构建记录为准，不能将编译通过视为真机功能验证。
 

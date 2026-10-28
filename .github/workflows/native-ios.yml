@@ -11,6 +11,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    permissions:
+      contents: write
     runs-on: xcode-27
     timeout-minutes: 40
     steps:
@@ -43,10 +45,16 @@ jobs:
           mkdir -p build/package/Payload
           ditto build/device/Build/Products/Release-iphoneos/NICMusic.app build/package/Payload/NICMusic.app
           test -f build/package/Payload/NICMusic.app/dist/index.html
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' build/package/Payload/NICMusic.app/Info.plist)
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' build/package/Payload/NICMusic.app/Info.plist)
+          IPA_NAME="NIC-Music-${VERSION}-build${BUILD}.ipa"
+          echo "ipa_name=$IPA_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
           cd build/package
-          zip -qry NIC-Music-0.2.1-build5-Test-Unsigned.ipa Payload
-          unzip -t NIC-Music-0.2.1-build5-Test-Unsigned.ipa
-          shasum -a 256 *.ipa > SHA256.txt
+          zip -qry "$IPA_NAME" Payload
+          unzip -t "$IPA_NAME"
+          shasum -a 256 "$IPA_NAME" > SHA256.txt
       - name: Simulator launch proof
         timeout-minutes: 15
         working-directory: native-ios
@@ -92,14 +100,46 @@ jobs:
             cp "$APP_DATA/Library/Caches/ImportDiagnostics.log" build-import-events.log || true
             xcrun simctl spawn "$DEVICE" log show --last 10m --style compact --predicate 'process == "NICMusic" OR (process == "com.apple.DocumentManagerUICore.DocumentManagerService" AND messageType == error)' > build-import-runtime.log 2>&1 || true
           fi
+      - name: Publish direct IPA download
+        if: success() && steps.package.outcome == 'success' && steps.verify.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          IPA_NAME: ${{ steps.package.outputs.ipa_name }}
+          APP_VERSION: ${{ steps.package.outputs.version }}
+          APP_BUILD: ${{ steps.package.outputs.build }}
+        run: |
+          set -euo pipefail
+          # A unique tag keeps earlier packages intact, including workflow reruns.
+          TAG="ios-${APP_VERSION}-build${APP_BUILD}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          NOTES="$RUNNER_TEMP/nic-music-release.md"
+          cat > "$NOTES" <<EOF
+          下载附件 **${IPA_NAME}** 即可，无需解压。
+
+          开发测试版，未签名，需自行签名安装。版本：${APP_VERSION} (${APP_BUILD})。
+          已通过设备及模拟器构建和自动化测试；测试通过不代表真机导入问题已解决。
+
+          构建记录：https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          源码提交：${GITHUB_SHA}
+          EOF
+          gh release create "$TAG" \
+            "native-ios/build/package/$IPA_NAME" \
+            native-ios/build/package/SHA256.txt \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "NIC Music ${APP_VERSION} (${APP_BUILD}) · 测试版" \
+            --notes-file "$NOTES"
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${IPA_NAME}"
+          # Check the published attachment bytes, not just the upload response.
+          VERIFY_DIR="$RUNNER_TEMP/nic-music-release-check"
+          mkdir -p "$VERIFY_DIR"
+          gh release download "$TAG" --pattern "$IPA_NAME" --dir "$VERIFY_DIR"
+          cmp "native-ios/build/package/$IPA_NAME" "$VERIFY_DIR/$IPA_NAME"
+          echo "[直接下载 ${IPA_NAME}](${DOWNLOAD_URL})" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
-        if: always() && steps.package.outcome == 'success' && steps.verify.outcome == 'success'
+        if: always()
         with:
-          name: NIC-Music-iOS
-          path: |
-            native-ios/build/package/*.ipa
-            native-ios/build/package/SHA256.txt
-            native-ios/build/library-*.png
+          name: Native-simulator-screenshots
+          path: native-ios/build/library-*.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
