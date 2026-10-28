@@ -155,7 +155,7 @@ struct NowPlayingView: View {
             PlaybackSlider(value: Binding(get: { scrubbing ? scrub : library.position }, set: { scrub = $0 }), maximum: max(1, library.duration), editing: { active in scrubbing = active; if !active { library.seek(scrub) } }).frame(height: 32).accessibilityLabel("播放进度")
             HStack {
                 Text(clock(scrubbing ? scrub : library.position)); Spacer()
-                if let quality = library.current?.quality, quality.lossless { Button { showQuality = true } label: { Label("无损", systemImage: "waveform").font(.caption.weight(.semibold)).padding(.horizontal, 12).padding(.vertical, 6) }.buttonStyle(.plain).foregroundStyle(.white).glassEffect(.clear, in: .capsule) }
+                if let quality = library.current?.quality { Button { showQuality = true } label: { HStack(spacing: 5) { if quality.atmos == true { DolbyMark().frame(width: 20, height: 14) } else { Image(systemName: "waveform") }; Text(quality.atmos == true ? "Dolby Atmos" : quality.lossless ? "无损" : quality.codec) }.font(.caption.weight(.semibold)).padding(.horizontal, 12).padding(.vertical, 6) }.buttonStyle(.plain).foregroundStyle(.white).glassEffect(.clear, in: .capsule) }
                 Spacer(); Text("−" + clock(max(0, library.duration - library.position)))
             }.font(.caption.monospacedDigit()).foregroundStyle(.white.opacity(0.55))
         }
@@ -239,4 +239,17 @@ private final class TranslucentVolumeView: MPVolumeView {
         }
     }
     @objc private func updateThumb(_ slider: UISlider) { slider.thumbTintColor = slider.isTracking ? nil : .white.withAlphaComponent(0.3) }
+}
+
+private struct DolbyMark: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width, h = rect.height
+        path.move(to: .init(x: 0, y: 0)); path.addLine(to: .init(x: 0, y: h))
+        path.addCurve(to: .init(x: 0, y: 0), control1: .init(x: w * 0.62, y: h), control2: .init(x: w * 0.62, y: 0))
+        path.closeSubpath()
+        path.move(to: .init(x: w, y: 0)); path.addLine(to: .init(x: w, y: h))
+        path.addCurve(to: .init(x: w, y: 0), control1: .init(x: w * 0.38, y: h), control2: .init(x: w * 0.38, y: 0))
+        path.closeSubpath(); return path
+    }
 }

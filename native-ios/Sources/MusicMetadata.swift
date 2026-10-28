@@ -8,8 +8,9 @@ struct AudioQuality: Codable, Equatable {
     var bitDepth: Int?
     var channels: Int
     var lossless: Bool
+    var atmos: Bool? = nil
     var description: String {
-        [codec, bitDepth.map { "\($0) 位" }, String(format: "%g kHz", sampleRate / 1000)].compactMap { $0 }.joined(separator: " · ")
+        [atmos == true ? "Dolby Atmos · " + codec : codec, "\(channels) 声道", bitDepth.map { "\($0) 位" }, String(format: "%g kHz", sampleRate / 1000)].compactMap { $0 }.joined(separator: " · ")
     }
     static func read(_ url: URL) -> AudioQuality? {
         var file: AudioFileID?
@@ -27,11 +28,12 @@ struct AudioQuality: Codable, Equatable {
             bits = [1: 16, 2: 20, 3: 24, 4: 32][Int(format.mFormatFlags)] ?? bits
         case kAudioFormatFLAC: codec = "FLAC"; lossless = true
         case kAudioFormatLinearPCM: codec = "PCM"; lossless = true
+        case kAudioFormatEnhancedAC3: codec = "E-AC-3"; lossless = false
         case kAudioFormatMPEGLayer3: codec = "MP3"; lossless = false
         case kAudioFormatMPEG4AAC, kAudioFormatMPEG4AAC_HE, kAudioFormatMPEG4AAC_HE_V2: codec = "AAC"; lossless = false
         default: codec = "音频"; lossless = false
         }
-        return AudioQuality(codec: codec, sampleRate: format.mSampleRate, bitDepth: bits > 0 ? bits : nil, channels: Int(format.mChannelsPerFrame), lossless: lossless)
+        return AudioQuality(codec: codec, sampleRate: format.mSampleRate, bitDepth: bits > 0 ? bits : nil, channels: Int(format.mChannelsPerFrame), lossless: lossless, atmos: format.mFormatID == kAudioFormatEnhancedAC3 && AtmosMetadata.read(url))
     }
 }
 
