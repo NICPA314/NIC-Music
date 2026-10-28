@@ -36,7 +36,7 @@ struct LibraryRoot: View {
                 }
             }
         }
-        .tabViewBottomAccessory {
+        .musicAccessory(enabled: library.current != nil) {
             if let song = library.current {
                 HStack(spacing: 12) {
                     Button { presented = song } label: {
@@ -78,6 +78,13 @@ struct LibraryRoot: View {
                 } header: { Text("歌曲 · \(songs.count)") }
             }.listStyle(.plain)
         }
+    }
+}
+
+private extension View {
+    @ViewBuilder func musicAccessory<Accessory: View>(enabled: Bool, @ViewBuilder content: () -> Accessory) -> some View {
+        if enabled { self.tabViewBottomAccessory(content: content) }
+        else { self }
     }
 }
 
