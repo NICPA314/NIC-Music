@@ -8,10 +8,19 @@ actor MusicFileImporter {
     static let shared = MusicFileImporter()
 
     func storeArtwork(_ data: Data, beside audio: String, in folder: URL) throws -> String {
-        let ext = data.starts(with: [0x89, 0x50, 0x4E, 0x47]) ? "png" : "jpg"
+        let bytes: Data
+        let ext: String
+        if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
+            bytes = data; ext = "png"
+        } else if data.starts(with: [0xFF, 0xD8, 0xFF]) {
+            bytes = data; ext = "jpg"
+        } else {
+            guard let image = UIImage(data: data), let converted = image.pngData() else { throw CocoaError(.fileReadCorruptFile) }
+            bytes = converted; ext = "png"
+        }
         let stem = (audio as NSString).deletingPathExtension
         let name = stem + ".cover-" + UUID().uuidString.prefix(8) + "." + ext
-        try data.write(to: folder.appendingPathComponent(name), options: .atomic)
+        try bytes.write(to: folder.appendingPathComponent(name), options: .atomic)
         return name
     }
 

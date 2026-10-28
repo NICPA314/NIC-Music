@@ -259,7 +259,7 @@ struct Song: Identifiable, Codable, Equatable {
             var videoFilename: String?
             if video {
                 let location = songs[i].filename.split(separator: "/").dropLast().map(String.init)
-                let name = URL(fileURLWithPath: songs[i].filename).deletingPathExtension().lastPathComponent + ".cover.mp4"
+                let name = URL(fileURLWithPath: songs[i].filename).deletingPathExtension().lastPathComponent + ".cover." + file.pathExtension.lowercased()
                 videoFilename = try await MusicFileImporter.shared.place(file.lastPathComponent, in: folder, location: location, originalName: name)
                 importedURL = folder.appendingPathComponent(videoFilename!)
             }
