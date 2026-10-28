@@ -12,9 +12,12 @@ final class DocumentPickerTests: XCTestCase {
         let browse = app.buttons["Browse"].firstMatch
         XCTAssertTrue(browse.waitForExistence(timeout: 60)); browse.tap()
         let local = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "On My iPhone")).firstMatch
-        if !local.waitForExistence(timeout: 5) {
-            let back = app.navigationBars.buttons["Browse"].firstMatch
-            if back.exists { back.tap() }
+        // The provider can remember the folder selected by the preceding test.
+        for _ in 0..<4 {
+            if local.waitForExistence(timeout: 2) { break }
+            let back = app.navigationBars.buttons.matching(NSPredicate(format: "label IN %@", ["Browse", "On My iPhone", "NIC Music"])).firstMatch
+            guard back.exists else { break }
+            back.tap()
         }
         XCTAssertTrue(local.waitForExistence(timeout: 10)); local.tap()
         let appFolder = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "NIC Music")).firstMatch
@@ -24,7 +27,9 @@ final class DocumentPickerTests: XCTestCase {
         // Folder selection must work without selecting an individual audio file.
         let finish = app.buttons["Open"].firstMatch
         XCTAssertTrue(finish.waitForExistence(timeout: 15))
-        XCTAssertTrue(finish.isEnabled); finish.tap()
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: finish)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 15), .completed)
+        finish.tap()
         let result = app.alerts["导入结果"]
         XCTAssertTrue(result.waitForExistence(timeout: 45))
         XCTAssertFalse(result.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "失败")).firstMatch.exists)
