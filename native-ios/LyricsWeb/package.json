@@ -1,0 +1,1 @@
+{"name":"nic-music-lyrics","private":true,"type":"module","scripts":{"build":"vite build"},"dependencies":{"@applemusic-like-lyrics/core":"0.6.0","@applemusic-like-lyrics/lyric":"1.1.0","@applemusic-like-lyrics/ttml":"1.0.1"},"devDependencies":{"vite":"6.1.0","typescript":"5.7.3"}}

@@ -1,0 +1,73 @@
+name: Native iOS IPA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: native-ios/LyricsWeb/package-lock.json
+      - name: Build offline AMLL lyrics
+        working-directory: native-ios/LyricsWeb
+        run: npm ci --ignore-scripts && npm run build
+      - name: Generate native project
+        working-directory: native-ios
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen generate
+      - name: Build device and simulator
+        working-directory: native-ios
+        run: |
+          set -euo pipefail
+          xcodebuild build -project NICMusic.xcodeproj -scheme NICMusic -configuration Release -destination 'generic/platform=iOS' -derivedDataPath build/device CODE_SIGNING_ALLOWED=NO > build-device.log 2>&1 || { tail -100 build-device.log; exit 1; }
+          xcodebuild build -project NICMusic.xcodeproj -scheme NICMusic -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build/simulator CODE_SIGNING_ALLOWED=NO > build-simulator.log 2>&1 || { tail -100 build-simulator.log; exit 1; }
+      - name: Package
+        working-directory: native-ios
+        run: |
+          set -euo pipefail
+          mkdir -p build/package/Payload
+          ditto build/device/Build/Products/Release-iphoneos/NICMusic.app build/package/Payload/NICMusic.app
+          test -f build/package/Payload/NICMusic.app/dist/index.html
+          cd build/package
+          zip -qry NIC-Music-0.1.0-Test-Unsigned.ipa Payload
+          unzip -t NIC-Music-0.1.0-Test-Unsigned.ipa
+          shasum -a 256 *.ipa > SHA256.txt
+      - name: Simulator launch proof
+        working-directory: native-ios
+        run: |
+          set -euo pipefail
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for k,v in d["devices"].items() if "iOS" in k for x in v if "iPhone" in x["name"]))')
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl install "$DEVICE" build/simulator/Build/Products/Debug-iphonesimulator/NICMusic.app
+          xcrun simctl launch "$DEVICE" app.nicpa.amllplayer.test
+          sleep 5
+          xcrun simctl io "$DEVICE" screenshot build/library-light.png
+          xcrun simctl ui "$DEVICE" appearance dark
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot build/library-dark.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NIC-Music-iOS
+          path: |
+            native-ios/build/package/*.ipa
+            native-ios/build/package/SHA256.txt
+            native-ios/build/library-*.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Native-build-logs
+          path: native-ios/build-*.log
+          retention-days: 7

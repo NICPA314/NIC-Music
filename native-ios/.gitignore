@@ -1,0 +1,5 @@
+*.xcodeproj/
+build/
+Info.plist
+LyricsWeb/node_modules/
+LyricsWeb/dist/
