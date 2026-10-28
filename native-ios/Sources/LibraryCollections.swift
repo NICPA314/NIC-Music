@@ -106,6 +106,7 @@ struct PlaylistDetailView: View {
                         Menu {
                             Button("选择音乐文件", systemImage: "music.note") { onImport(false) }
                             Button("导入文件夹", systemImage: "folder") { onImport(true) }
+                            Button("读取 App 内“待导入”文件夹", systemImage: "tray.and.arrow.down") { Task { await library.importInboxContents(playlistID: playlistID) } }
                         } label: { Label("导入音乐", systemImage: "plus").font(.headline).padding(.horizontal, 24).frame(height: 56).glassEffect(.clear.interactive(), in: .capsule) }.buttonStyle(.plain)
                     }
                     LazyVStack(spacing: 0) {
@@ -129,6 +130,7 @@ struct PlaylistDetailView: View {
                 Menu {
                     Button("选择音乐文件", systemImage: "music.note") { onImport(false) }
                     Button("导入文件夹", systemImage: "folder") { onImport(true) }
+                            Button("读取 App 内“待导入”文件夹", systemImage: "tray.and.arrow.down") { Task { await library.importInboxContents(playlistID: playlistID) } }
                 } label: { Image(systemName: "plus").frame(width: 44, height: 44) }.glassEffect(.clear.interactive(), in: .circle).buttonStyle(.plain).disabled(library.importing)
             }.sharedBackgroundVisibility(.hidden)
         }

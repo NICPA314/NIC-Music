@@ -94,6 +94,7 @@ struct LibraryRoot: View {
         Menu {
             Button("选择音乐文件", systemImage: "music.note") { startImport(folder: false) }
             Button("导入文件夹", systemImage: "folder") { startImport(folder: true) }
+            Button("读取 App 内“待导入”文件夹", systemImage: "tray.and.arrow.down") { Task { await library.importInboxContents() } }
         } label: { Label("导入音乐", systemImage: "plus").labelStyle(.titleAndIcon).font(.headline).padding(.horizontal, 24).frame(minHeight: 56).contentShape(Capsule()) }
             .buttonStyle(.plain).glassEffect(.clear.interactive(), in: .capsule).disabled(library.importing).accessibilityIdentifier("import-music")
     }
@@ -101,6 +102,7 @@ struct LibraryRoot: View {
         Menu {
             Button("选择音乐文件", systemImage: "music.note") { startImport(folder: false) }
             Button("导入文件夹", systemImage: "folder") { startImport(folder: true) }
+            Button("读取 App 内“待导入”文件夹", systemImage: "tray.and.arrow.down") { Task { await library.importInboxContents() } }
         } label: { Image(systemName: "plus").font(.title2).frame(width: 44, height: 44) }.glassEffect(.clear.interactive(), in: .circle)
             .buttonStyle(.plain).disabled(library.importing).accessibilityLabel("导入音乐").accessibilityIdentifier("import-music")
     }

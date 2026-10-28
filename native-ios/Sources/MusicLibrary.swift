@@ -68,6 +68,10 @@ struct Song: Identifiable, Codable, Equatable {
     private var player: AVAudioPlayer?
     private var timer: Timer?
     let folder: URL
+    var importInbox: URL { folder.deletingLastPathComponent().appendingPathComponent("待导入", isDirectory: true) }
+    func importInboxContents(playlistID: UUID? = nil) async {
+        await importDirectory(importInbox, playlistID: playlistID)
+    }
     var current: Song? { songs.first { $0.id == currentID } }
     var librarySongs: [Song] { songs.filter { $0.storagePlaylistID == nil } }
     override convenience init() {
@@ -78,6 +82,7 @@ struct Song: Identifiable, Codable, Equatable {
         super.init()
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: importInbox, withIntermediateDirectories: true)
             let index = folder.appendingPathComponent("library.json")
             if FileManager.default.fileExists(atPath: index.path) { songs = try JSONDecoder().decode([Song].self, from: Data(contentsOf: index)) }
             var artworkCache: [String: Data] = [:]
