@@ -20,7 +20,7 @@ struct AlbumDetailView: View {
                         NavigationLink(first.albumArtist ?? first.artist) { ArtistDetailView(artist: first.albumArtist ?? first.artist) }.font(.title3)
                         Text([first.genre, first.releaseDate].compactMap { $0 }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
                     }
-                    Button("播放", systemImage: "play.fill") { library.play(first, queue: songs) }.buttonStyle(.glassProminent)
+                    Button("播放", systemImage: "play.fill") { library.play(first, queue: songs) }.buttonStyle(ClearGlassButtonStyle())
                     VStack(spacing: 0) {
                         ForEach(songs) { song in
                             Button { library.play(song, queue: songs) } label: {

@@ -40,6 +40,24 @@ final class DocumentPickerTests: XCTestCase {
         }
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "folder-import-three-tracks"; screenshot.lifetime = .keepAlways; add(screenshot)
+        let search = app.buttons["search-tab"]
+        XCTAssertTrue(search.exists)
+        XCTAssertGreaterThan(search.frame.midX, app.frame.width * 0.8)
+        search.tap()
+        let field = app.textFields["music-search-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText("Second Track")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Second Track")).firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Third Track")).firstMatch.exists)
+        app.buttons["library-tab"].tap()
+        let back = app.navigationBars.buttons["资料库"].firstMatch
+        if back.exists { back.tap() }
+        let settings = app.buttons["设置"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 10)); settings.tap()
+        XCTAssertFalse(app.staticTexts["AMLL Player 开源项目"].exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "导入文件夹可")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["复制导入诊断"].waitForExistence(timeout: 10))
+        let settingsImage = XCTAttachment(screenshot: app.screenshot())
+        settingsImage.name = "settings-version-and-diagnostics"; settingsImage.lifetime = .keepAlways; add(settingsImage)
     }
 
     @MainActor func testSelectFileImportAndPlay() throws {

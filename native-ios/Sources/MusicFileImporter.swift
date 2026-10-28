@@ -7,6 +7,27 @@ import CryptoKit
 actor MusicFileImporter {
     static let shared = MusicFileImporter()
 
+    func artistPortrait(beside audio: URL, within root: URL) -> Data? {
+        let boundary = root.standardizedFileURL.path
+        var directory = audio.deletingLastPathComponent().standardizedFileURL
+        var directories: [URL] = []
+        while directory.path == boundary || directory.path.hasPrefix(boundary + "/") {
+            directories.append(directory)
+            if directory.path == boundary { break }
+            directory.deleteLastPathComponent()
+        }
+        // Prefer the artist's parent directory to an album's local folder image.
+        let candidates = Array(directories.dropFirst()) + Array(directories.prefix(1))
+        for directory in candidates {
+            guard let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { continue }
+            for ext in ["jpg", "jpeg", "png", "heic", "webp"] {
+                if let file = files.first(where: { $0.deletingPathExtension().lastPathComponent.lowercased() == "folder" && $0.pathExtension.lowercased() == ext }),
+                   let data = try? Data(contentsOf: file), UIImage(data: data) != nil { return data }
+            }
+        }
+        return nil
+    }
+
     func storeArtwork(_ data: Data, beside audio: String, in folder: URL) throws -> String {
         let bytes: Data
         let ext: String
@@ -62,20 +83,28 @@ actor MusicFileImporter {
         return destination
     }
 
-    func importAudio(_ source: URL, into folder: URL, companions: Bool = false) async throws -> Song {
+    func importAudio(_ source: URL, into folder: URL, companions: Bool = false, progress: @Sendable (String) async -> Void = { _ in }) async throws -> Song {
+        await progress("正在复制到应用")
+        ImportDiagnostics.record("audio copy started")
         let destination = try copy(source, into: folder.appendingPathComponent("Audio", isDirectory: true))
+        ImportDiagnostics.record("audio copy completed")
         var videoCopy: URL?
         var videoAspectRatio: Double?
         do {
+            await progress("正在验证音频")
             let audio = try AVAudioPlayer(contentsOf: destination)
             guard audio.duration > 0, audio.prepareToPlay() else { throw CocoaError(.fileReadCorruptFile) }
+            await progress("正在读取元数据")
+            ImportDiagnostics.record("metadata started")
             let tags = try await Self.metadata(at: destination)
+            ImportDiagnostics.record("metadata completed, title=\(tags.title != nil)")
             guard let title = tags.title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw ImportError.missingTitle
             }
             var artwork = tags.artwork.flatMap { UIImage(data: $0) == nil ? nil : $0 }
             var lyrics: String?, lyricKind: String?
             if companions {
+                await progress("正在读取封面与歌词")
                 let siblings = try FileManager.default.contentsOfDirectory(at: source.deletingLastPathComponent(), includingPropertiesForKeys: nil)
                 if artwork == nil {
                     let imageTypes = ["jpg", "jpeg", "png", "heic", "webp"]
@@ -99,6 +128,7 @@ actor MusicFileImporter {
                     }
                 }
             }
+            await progress("正在检查重复文件")
             let handle = try FileHandle(forReadingFrom: destination)
             defer { try? handle.close() }
             var hash = SHA256()

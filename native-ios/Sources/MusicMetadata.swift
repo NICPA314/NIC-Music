@@ -51,6 +51,8 @@ struct EmbeddedTags {
 }
 
 struct Playlist: Identifiable, Codable, Equatable {
+    var artworkFilename: String?
+    var pinned: Bool?
     var id = UUID()
     var name: String
     var songIDs: [UUID] = []

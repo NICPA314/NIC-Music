@@ -48,6 +48,7 @@ struct Song: Identifiable, Codable, Equatable {
 @MainActor @Observable final class MusicLibrary: NSObject, AVAudioPlayerDelegate {
     var songs: [Song] = []
     var playlists: [Playlist] = []
+    var playlistArtwork: [UUID: Data] = [:]
     var artistArtwork: [String: Data] = [:]
     var currentID: UUID?
     private var queueIDs: [UUID] = []
@@ -58,6 +59,8 @@ struct Song: Identifiable, Codable, Equatable {
     var importing = false
     var importProgress = ""
     var importSummary: String?
+    var importStatus = "尚未导入音乐"
+    var pendingSelectionID: UUID?
     var importingAttachment = false
     var error: String?
     private var player: AVAudioPlayer?
@@ -80,6 +83,9 @@ struct Song: Identifiable, Codable, Equatable {
             }
             let lists = folder.appendingPathComponent("playlists.json")
             if FileManager.default.fileExists(atPath: lists.path) { playlists = try JSONDecoder().decode([Playlist].self, from: Data(contentsOf: lists)) }
+            for playlist in playlists {
+                if let filename = playlist.artworkFilename { playlistArtwork[playlist.id] = try? Data(contentsOf: folder.appendingPathComponent(filename)) }
+            }
             let artists = folder.appendingPathComponent("artists.json")
             if FileManager.default.fileExists(atPath: artists.path) { artistArtwork = try JSONDecoder().decode([String: Data].self, from: Data(contentsOf: artists)) }
         } catch { self.error = "资料库读取失败：\(error.localizedDescription)" }
@@ -106,17 +112,20 @@ struct Song: Identifiable, Codable, Equatable {
         guard !importing else { return }
         let access = directory.startAccessingSecurityScopedResource()
         defer { if access { directory.stopAccessingSecurityScopedResource() } }
-        importing = true; importSummary = nil; importProgress = "正在扫描文件夹…"
+        importing = true; importSummary = nil; importProgress = "正在扫描文件夹…"; importStatus = importProgress
+        ImportDiagnostics.record("folder scan started")
         do {
             let urls = try await MusicFileImporter.shared.audioFiles(in: directory)
+            ImportDiagnostics.record("folder scan found \(urls.count) audio files")
             importing = false
             if urls.isEmpty { importSummary = "文件夹中没有可导入的音频。"; importProgress = "" }
             else { await importSongs(urls, companions: true, playlistID: playlistID, folderRoot: directory) }
-        } catch { importing = false; importProgress = ""; self.error = "文件夹读取失败：\(error.localizedDescription)" }
+        } catch { importing = false; importProgress = ""; self.error = "文件夹读取失败：\(error.localizedDescription)"; importStatus = self.error! }
     }
     func importSongs(_ urls: [URL], companions: Bool = false, playlistID: UUID? = nil, folderRoot: URL? = nil) async {
         guard !importing, !urls.isEmpty else { return }
         importing = true
+        error = nil
         NSLog("NICImport: starting coordinated import of %ld file(s)", urls.count)
         ImportDiagnostics.record("import started \(urls.count)")
         importSummary = nil
@@ -130,7 +139,12 @@ struct Song: Identifiable, Codable, Equatable {
             importProgress = "正在读取音频和元数据 \(index + 1)/\(urls.count)：\(url.lastPathComponent)"
             var copied: Song?
             do {
-                var song = try await MusicFileImporter.shared.importAudio(url, into: folder, companions: companions)
+                var song = try await MusicFileImporter.shared.importAudio(url, into: folder, companions: companions) { stage in
+                    await MainActor.run {
+                        self.importProgress = "\(stage) · \(index + 1)/\(urls.count)"
+                        self.importStatus = self.importProgress
+                    }
+                }
                 copied = song
                 if let hash = song.contentHash, let existing = songs.first(where: { $0.contentHash == hash && $0.storagePlaylistID == playlistID }) {
                     importedIDs.append(existing.id); skipped += 1
@@ -173,9 +187,20 @@ struct Song: Identifiable, Codable, Equatable {
                 let updated = songs + [song]
                 try persist(updated)
                 songs = updated
+                if let folderRoot {
+                    let artist = song.albumArtist ?? song.artist
+                    if artistArtwork[artist] == nil,
+                       let photo = await MusicFileImporter.shared.artistPortrait(beside: url, within: folderRoot) {
+                        var portraits = artistArtwork; portraits[artist] = photo
+                        do { try JSONEncoder().encode(portraits).write(to: folder.appendingPathComponent("artists.json"), options: .atomic); artistArtwork = portraits }
+                        catch { ImportDiagnostics.record("artist portrait persistence failed") }
+                    }
+                }
                 imported += 1
                 importedIDs.append(song.id)
             } catch {
+                let failure = error as NSError
+                ImportDiagnostics.record("file failed: \(failure.domain) / \(failure.code)")
                 if let copied { try? FileManager.default.removeItem(at: folder.appendingPathComponent(copied.filename)) }
                 if let video = copied?.videoFilename { try? FileManager.default.removeItem(at: folder.appendingPathComponent(video)) }
                 if let artwork = copied?.artworkFilename { try? FileManager.default.removeItem(at: folder.appendingPathComponent(artwork)) }
@@ -188,6 +213,7 @@ struct Song: Identifiable, Codable, Equatable {
             savePlaylists()
         }
         importSummary = "已导入 \(imported) 首歌曲，跳过 \(skipped) 首重复歌曲" + (failures.isEmpty ? "。" : "，\(failures.count) 个文件失败。\n" + failures.joined(separator: "\n"))
+        importStatus = "已导入 \(imported) 首，跳过 \(skipped) 首，失败 \(failures.count) 个文件"
         NSLog("NICImport: completed %ld, skipped %ld, failed %ld", imported, skipped, failures.count)
         ImportDiagnostics.record("import completed \(imported), skipped \(skipped), failed \(failures.count)")
     }
@@ -199,6 +225,37 @@ struct Song: Identifiable, Codable, Equatable {
     private func savePlaylists() {
         do { try JSONEncoder().encode(playlists).write(to: folder.appendingPathComponent("playlists.json"), options: .atomic) }
         catch { self.error = "播放列表保存失败：\(error.localizedDescription)" }
+    }
+    func setPlaylistArtwork(_ source: URL?, playlistID: UUID) async {
+        guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
+        let previous = playlists[index].artworkFilename
+        var newFile: URL?
+        do {
+            var updated = playlists
+            var preview: Data?
+            if let source {
+                let (file, data) = try await MusicFileImporter.shared.importCover(source, video: false, into: folder)
+                newFile = file
+                let name = playlists[index].name + "-" + playlistID.uuidString.prefix(8)
+                let path = try await MusicFileImporter.shared.place(file.lastPathComponent, in: folder, location: ["Playlists", name], originalName: "cover." + file.pathExtension)
+                newFile = folder.appendingPathComponent(path)
+                updated[index].artworkFilename = path; preview = data
+            } else { updated[index].artworkFilename = nil }
+            try JSONEncoder().encode(updated).write(to: folder.appendingPathComponent("playlists.json"), options: .atomic)
+            playlists = updated; playlistArtwork[playlistID] = preview
+            if let previous { try? FileManager.default.removeItem(at: folder.appendingPathComponent(previous)) }
+        } catch {
+            if let newFile { try? FileManager.default.removeItem(at: newFile) }
+            self.error = "播放列表封面保存失败：\(error.localizedDescription)"
+        }
+    }
+    func togglePlaylistPin(_ id: UUID) {
+        guard let index = playlists.firstIndex(where: { $0.id == id }) else { return }
+        var updated = playlists; updated[index].pinned = !(updated[index].pinned ?? false)
+        do {
+            try JSONEncoder().encode(updated).write(to: folder.appendingPathComponent("playlists.json"), options: .atomic)
+            playlists = updated
+        } catch { self.error = "播放列表置顶失败：\(error.localizedDescription)" }
     }
     func toggleFavorite() {
         guard let i = songs.firstIndex(where: { $0.id == currentID }) else { return }

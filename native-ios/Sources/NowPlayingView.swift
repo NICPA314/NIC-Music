@@ -30,7 +30,7 @@ struct NowPlayingView: View {
         GeometryReader { geometry in
             if let song = library.current {
                 ZStack {
-                    background(song, size: geometry.size)
+                    background(song)
                     VStack(spacing: 14) {
                         Button { dismiss() } label: { Capsule().fill(.white.opacity(0.4)).frame(width: 44, height: 5).frame(height: 20) }.accessibilityLabel("关闭播放页")
                         if mode != 0 { songHeader(song, compact: true) }
@@ -89,8 +89,10 @@ struct NowPlayingView: View {
         .alert("无法完成操作", isPresented: Binding(get: { library.error != nil }, set: { if !$0 { library.error = nil } })) { Button("好") { library.error = nil } } message: { Text(library.error ?? "") }
         .onChange(of: library.currentID) { hasTranslation = false; hasPronunciation = false }
     }
-    private func background(_ song: Song, size: CGSize) -> some View {
-        ZStack(alignment: .top) {
+    private func background(_ song: Song) -> some View {
+        GeometryReader { canvas in
+            let size = canvas.size
+            ZStack(alignment: .top) {
             Cover(song: song).frame(width: size.width, height: size.height).blur(radius: 65).scaleEffect(1.25)
             Color.black.opacity(0.4)
             if mode == 0, let filename = song.videoFilename {
@@ -100,7 +102,8 @@ struct NowPlayingView: View {
                     .mask(LinearGradient(stops: [.init(color: .white, location: 0), .init(color: .white, location: 0.62), .init(color: .white.opacity(0.65), location: 0.8), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom))
                 LinearGradient(stops: [.init(color: .clear, location: 0.36), .init(color: .black.opacity(0.12), location: 0.64), .init(color: .black.opacity(0.45), location: 1)], startPoint: .top, endPoint: .bottom)
             }
-        }.frame(width: size.width, height: size.height).clipped().ignoresSafeArea()
+            }.frame(width: size.width, height: size.height).clipped()
+        }.ignoresSafeArea()
     }
     private func songHeader(_ song: Song, compact: Bool) -> some View {
         HStack(spacing: 12) {
@@ -127,12 +130,12 @@ struct NowPlayingView: View {
                 Menu {
                     Toggle("显示发音", isOn: $pronunciation).disabled(!hasPronunciation)
                     Toggle("显示翻译", isOn: $translation).disabled(!hasTranslation)
-                } label: { Image(systemName: "translate").frame(width: 28, height: 28) }.buttonStyle(.glass).accessibilityLabel("歌词显示选项")
+                } label: { Image(systemName: "translate").frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }.buttonStyle(.plain).accessibilityLabel("歌词显示选项")
                 Spacer()
             }
         } else {
             ContentUnavailableView { Label("让歌词跟随音乐", systemImage: "quote.bubble") } description: { Text("支持 LRC 与逐字 TTML 歌词") } actions: {
-                Button("导入歌词") { attachment = AttachmentImport(songID: song.id, kind: 0) }.buttonStyle(.glass)
+                Button("导入歌词") { attachment = AttachmentImport(songID: song.id, kind: 0) }.buttonStyle(ClearGlassButtonStyle())
             }.frame(maxHeight: .infinity)
         }
     }

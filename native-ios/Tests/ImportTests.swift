@@ -168,4 +168,44 @@ import MediaPlayer
         let filename = try XCTUnwrap(song.videoFilename)
         XCTAssertEqual(try Data(contentsOf: library.folder.appendingPathComponent(filename)), try Data(contentsOf: tall))
     }
+    func testArtistFolderPortraitPersistsAfterSourceRemoval() async throws {
+        _ = try copy(fixture("01. Wrong Filename"), to: "Input/Artist/Album/01.m4a")
+        let photo = Bundle(for: Self.self).url(forResource: "cover", withExtension: "png", subdirectory: "Fixtures")!
+        let albumPhoto = Bundle(for: Self.self).url(forResource: "embedded", withExtension: "png", subdirectory: "Fixtures")!
+        _ = try copy(photo, to: "Input/Artist/folder.png")
+        _ = try copy(albumPhoto, to: "Input/Artist/Album/folder.png")
+        await library.importDirectory(root.appendingPathComponent("Input"))
+        XCTAssertEqual(library.artistArtwork["Test Artist"], try Data(contentsOf: photo))
+        try FileManager.default.removeItem(at: root.appendingPathComponent("Input"))
+        let reloaded = MusicLibrary(folder: library.folder)
+        XCTAssertEqual(reloaded.artistArtwork["Test Artist"], try Data(contentsOf: photo))
+    }
+    func testPlaylistCustomCoverIsCopiedPersistedAndReset() async throws {
+        library.createPlaylist("My Playlist")
+        let id = try XCTUnwrap(library.playlists.first?.id)
+        let photo = Bundle(for: Self.self).url(forResource: "cover", withExtension: "png", subdirectory: "Fixtures")!
+        let source = try copy(photo, to: "Source/cover.png")
+        await library.setPlaylistArtwork(source, playlistID: id)
+        let file = try XCTUnwrap(library.playlists.first?.artworkFilename, library.error ?? "")
+        XCTAssertTrue(file.hasPrefix("Playlists/"))
+        try FileManager.default.removeItem(at: source)
+        let reloaded = MusicLibrary(folder: library.folder)
+        XCTAssertEqual(reloaded.playlistArtwork[id], try Data(contentsOf: photo))
+        await library.setPlaylistArtwork(nil, playlistID: id)
+        XCTAssertNil(library.playlists.first?.artworkFilename)
+        XCTAssertNil(library.playlistArtwork[id])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: library.folder.appendingPathComponent(file).path))
+    }
+    func testPlaylistPinPersistsWithoutRemovingFromFullList() throws {
+        library.createPlaylist("Pinned")
+        library.createPlaylist("Other")
+        let id = try XCTUnwrap(library.playlists.first?.id)
+        library.togglePlaylistPin(id)
+        let reloaded = MusicLibrary(folder: library.folder)
+        XCTAssertEqual(reloaded.playlists.count, 2)
+        XCTAssertEqual(reloaded.playlists.filter { $0.pinned == true }.map(\.id), [id])
+        library.togglePlaylistPin(id)
+        XCTAssertFalse(library.playlists.contains { $0.pinned == true })
+        XCTAssertEqual(library.playlists.count, 2)
+    }
 }
