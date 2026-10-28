@@ -90,13 +90,15 @@ struct NowPlayingView: View {
         .onChange(of: library.currentID) { hasTranslation = false; hasPronunciation = false }
     }
     private func background(_ song: Song, size: CGSize) -> some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Cover(song: song).frame(width: size.width, height: size.height).blur(radius: 65).scaleEffect(1.25)
             Color.black.opacity(0.4)
             if mode == 0, let filename = song.videoFilename {
                 LoopingCover(url: library.folder.appendingPathComponent(filename), active: library.playing && scenePhase == .active && !reduceMotion)
-                    .frame(width: size.width, height: size.height)
-                LinearGradient(stops: [.init(color: .clear, location: 0.3), .init(color: .black.opacity(0.45), location: 0.6), .init(color: .black.opacity(0.8), location: 1)], startPoint: .top, endPoint: .bottom)
+                    .frame(width: size.width, height: size.height * 0.72)
+                    .clipped()
+                    .mask(LinearGradient(stops: [.init(color: .white, location: 0), .init(color: .white, location: 0.62), .init(color: .white.opacity(0.65), location: 0.8), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom))
+                LinearGradient(stops: [.init(color: .clear, location: 0.36), .init(color: .black.opacity(0.12), location: 0.64), .init(color: .black.opacity(0.45), location: 1)], startPoint: .top, endPoint: .bottom)
             }
         }.frame(width: size.width, height: size.height).clipped().ignoresSafeArea()
     }

@@ -29,6 +29,7 @@ struct Song: Identifiable, Codable, Equatable {
     var sourceNumber: Int?
     var storagePlaylistID: UUID?
     var artworkFilename: String?
+    var videoAspectRatio: Double?
     var albumTitle: String { libraryAlbumTitle ?? album ?? "未知专辑" }
     var metadataAlbumKey: String { Self.normalized(album ?? "未知专辑") + "\u{1F}" + Self.normalized(albumArtist ?? artist) }
     var albumKey: String { libraryAlbumKey ?? metadataAlbumKey }
@@ -269,11 +270,13 @@ struct Song: Identifiable, Codable, Equatable {
             updated[i].artwork = thumbnail; updated[i].customArtwork = true
             updated[i].artworkFilename = artwork
             updated[i].videoFilename = videoFilename
+            if video, let preview = UIImage(data: thumbnail) { updated[i].videoAspectRatio = Double(preview.size.width / preview.size.height) }
+            else { updated[i].videoAspectRatio = nil }
             try persist(updated); songs = updated
             if !video { try? FileManager.default.removeItem(at: file) }
+            nowPlaying()
             if let previous { try? FileManager.default.removeItem(at: folder.appendingPathComponent(previous)) }
             if let previousArtwork { try? FileManager.default.removeItem(at: folder.appendingPathComponent(previousArtwork)) }
-            nowPlaying()
         } catch {
             if let importedURL { try? FileManager.default.removeItem(at: importedURL) }
             if let importedArtwork { try? FileManager.default.removeItem(at: folder.appendingPathComponent(importedArtwork)) }
@@ -284,6 +287,11 @@ struct Song: Identifiable, Codable, Equatable {
         guard let song = current else { return }
         var info: [String: Any] = [MPMediaItemPropertyTitle:song.title, MPMediaItemPropertyArtist:song.artist, MPMediaItemPropertyPlaybackDuration:duration, MPNowPlayingInfoPropertyElapsedPlaybackTime:position, MPNowPlayingInfoPropertyPlaybackRate:playing ? 1.0 : 0.0]
         if let data = song.artwork, let image = UIImage(data: data) { info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image } }
+        if let filename = song.videoFilename,
+           let key = AnimatedArtworkProvider.key(for: song.videoAspectRatio),
+           MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys.contains(key) {
+            info[key] = AnimatedArtworkProvider.artwork(url: folder.appendingPathComponent(filename))
+        }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 }

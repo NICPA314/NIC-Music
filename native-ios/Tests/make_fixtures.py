@@ -47,4 +47,5 @@ for index, (filename, title) in enumerate([("01. Wrong Filename", "Metadata Titl
     subprocess.run(args + [str(target)], check=True)
     target.write_bytes(add_label(target.read_bytes()))
 subprocess.run([ffmpeg, "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=128x128:rate=15:duration=1", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(folder / "cover.mp4")], check=True)
-print("Generated three ALAC tones, two solid-color images and an original test video.")
+subprocess.run([ffmpeg, "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=96x128:rate=15:duration=1", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(folder / "cover-tall.mp4")], check=True)
+print("Generated three ALAC tones, two solid-color images and two original test videos.")

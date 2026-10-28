@@ -65,6 +65,7 @@ actor MusicFileImporter {
     func importAudio(_ source: URL, into folder: URL, companions: Bool = false) async throws -> Song {
         let destination = try copy(source, into: folder.appendingPathComponent("Audio", isDirectory: true))
         var videoCopy: URL?
+        var videoAspectRatio: Double?
         do {
             let audio = try AVAudioPlayer(contentsOf: destination)
             guard audio.duration > 0, audio.prepareToPlay() else { throw CocoaError(.fileReadCorruptFile) }
@@ -87,10 +88,11 @@ actor MusicFileImporter {
                     if let sidecar = siblings.first(where: { $0.deletingPathExtension().lastPathComponent == source.deletingPathExtension().lastPathComponent && $0.pathExtension.lowercased() == ext }),
                        let text = try? readLyrics(sidecar) { lyrics = text; lyricKind = ext; break }
                 }
-                for name in ["portrait_animated_artwork.mp4", "square_animated_artwork.mp4", "cover.mp4"] {
+                for name in ["tall_animated_artwork.mp4", "portrait_animated_artwork.mp4", "square_animated_artwork.mp4", "cover.mp4"] {
                     if let video = siblings.first(where: { $0.lastPathComponent.lowercased() == name }) {
                         if let (file, poster) = try? await importCover(video, video: true, into: folder) {
                             videoCopy = file
+                            if let preview = UIImage(data: poster) { videoAspectRatio = Double(preview.size.width / preview.size.height) }
                             if artwork == nil { artwork = poster }
                         }
                         break
@@ -114,7 +116,8 @@ actor MusicFileImporter {
                         lyricKind: lyricKind, videoFilename: videoCopy?.lastPathComponent, album: tags.album, albumArtist: tags.albumArtist,
                         releaseDate: tags.releaseDate, copyright: tags.copyright, recordLabel: tags.recordLabel,
                         genre: tags.genre, composer: tags.composer, trackNumber: tags.trackNumber,
-                        discNumber: tags.discNumber, quality: AudioQuality.read(destination), contentHash: fingerprint, sourceNumber: number)
+                        discNumber: tags.discNumber, quality: AudioQuality.read(destination), contentHash: fingerprint, sourceNumber: number,
+                        videoAspectRatio: videoAspectRatio)
         } catch {
             try? FileManager.default.removeItem(at: destination)
             if let videoCopy { try? FileManager.default.removeItem(at: videoCopy) }

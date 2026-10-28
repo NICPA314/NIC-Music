@@ -1,5 +1,6 @@
 import XCTest
 import AVFoundation
+import MediaPlayer
 @testable import NICMusic
 
 @MainActor final class ImportTests: XCTestCase {
@@ -140,6 +141,8 @@ import AVFoundation
         await library.addCover(source, video: true, to: id)
         let filename = try XCTUnwrap(library.songs.first?.videoFilename, library.error ?? "")
         XCTAssertTrue(filename.hasPrefix("Albums/"))
+        XCTAssertEqual(library.songs.first?.videoAspectRatio, 1)
+        XCTAssertEqual(AnimatedArtworkProvider.key(for: library.songs.first?.videoAspectRatio), MPNowPlayingInfoProperty1x1AnimatedArtwork)
         try FileManager.default.removeItem(at: source)
         let asset = AVURLAsset(url: library.folder.appendingPathComponent(filename))
         let playable = try await asset.load(.isPlayable)
@@ -149,5 +152,20 @@ import AVFoundation
         XCTAssertNil(library.songs.first?.videoFilename)
         XCTAssertFalse(FileManager.default.fileExists(atPath: library.folder.appendingPathComponent(filename).path))
         XCTAssertEqual(library.songs.first?.title, "Metadata Title")
+        XCTAssertNil(library.songs.first?.videoAspectRatio)
+    }
+    func testTallVideoWinsOverSquareAndUsesLockScreenRatio() async throws {
+        _ = try copy(fixture("01. Wrong Filename"), to: "Input/01.m4a")
+        let square = Bundle(for: Self.self).url(forResource: "cover", withExtension: "mp4", subdirectory: "Fixtures")!
+        let tall = Bundle(for: Self.self).url(forResource: "cover-tall", withExtension: "mp4", subdirectory: "Fixtures")!
+        _ = try copy(square, to: "Input/square_animated_artwork.mp4")
+        _ = try copy(tall, to: "Input/tall_animated_artwork.mp4")
+        await library.importDirectory(root.appendingPathComponent("Input"))
+        let song = try XCTUnwrap(library.songs.first)
+        XCTAssertEqual(song.videoAspectRatio, 0.75)
+        XCTAssertEqual(AnimatedArtworkProvider.key(for: song.videoAspectRatio), MPNowPlayingInfoProperty3x4AnimatedArtwork)
+        XCTAssertNil(AnimatedArtworkProvider.key(for: 16.0 / 9.0))
+        let filename = try XCTUnwrap(song.videoFilename)
+        XCTAssertEqual(try Data(contentsOf: library.folder.appendingPathComponent(filename)), try Data(contentsOf: tall))
     }
 }
