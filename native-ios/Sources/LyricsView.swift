@@ -60,7 +60,10 @@ struct LyricsView: UIViewRepresentable {
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let body = message.body as? [String:Any] else { return }
             if body["event"] as? String == "ready" { ImportDiagnostics.record("AMLL page ready"); ready = true; sync() }
-            if body["event"] as? String == "backgroundReady" { ImportDiagnostics.record("AMLL background ready") }
+            if body["event"] as? String == "backgroundReady" {
+                ImportDiagnostics.record("AMLL background ready")
+                web?.accessibilityIdentifier = "amll-background-ready"
+            }
             if body["event"] as? String == "error" { onError?(body["message"] as? String ?? "歌词读取失败") }
             if body["event"] as? String == "loaded" { onCapabilities?(body["translation"] as? Bool ?? false, body["pronunciation"] as? Bool ?? false) }
         }
@@ -75,6 +78,7 @@ struct LyricsView: UIViewRepresentable {
             if backgroundOnly {
                 if loaded != song {
                     loaded = song; failed = false
+                    ImportDiagnostics.record("AMLL background requested")
                     let artwork = song.artwork.map { data in
                         let mime = data.starts(with: [0x89, 0x50, 0x4E, 0x47]) ? "image/png" : "image/jpeg"
                         return "data:\(mime);base64," + data.base64EncodedString()

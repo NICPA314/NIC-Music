@@ -115,5 +115,8 @@ final class DocumentPickerTests: XCTestCase {
         XCTAssertEqual(playback.label, "暂停")
         playback.tap()
         XCTAssertEqual(playback.label, "播放")
+        // Native controls appear before WKWebView and its first GPU frame are
+        // ready. Keep the app alive until the actual renderer acknowledges it.
+        XCTAssertTrue(app.webViews["amll-background-ready"].firstMatch.waitForExistence(timeout: 30))
     }
 }

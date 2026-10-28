@@ -51,7 +51,7 @@ struct NowPlayingView: View {
                             Spacer(minLength: 0)
                             if song.videoFilename == nil {
                                 Cover(song: song).aspectRatio(1, contentMode: .fit)
-                                    .frame(maxWidth: min(geometry.size.width - 88, 340), maxHeight: geometry.size.height * 0.43)
+                                    .frame(maxWidth: max(1, min(geometry.size.width - 88, 340)), maxHeight: max(1, geometry.size.height * 0.43))
                                     .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
                             }
                             Spacer(minLength: 0)
