@@ -152,7 +152,7 @@ struct NowPlayingView: View {
     }
     private var progress: some View {
         VStack(spacing: 0) {
-            Slider(value: Binding(get: { scrubbing ? scrub : library.position }, set: { scrub = $0 }), in: 0...max(1, library.duration), onEditingChanged: { active in scrubbing = active; if !active { library.seek(scrub) } }).tint(.white.opacity(0.8)).accessibilityLabel("播放进度")
+            PlaybackSlider(value: Binding(get: { scrubbing ? scrub : library.position }, set: { scrub = $0 }), maximum: max(1, library.duration), editing: { active in scrubbing = active; if !active { library.seek(scrub) } }).frame(height: 32).accessibilityLabel("播放进度")
             HStack {
                 Text(clock(scrubbing ? scrub : library.position)); Spacer()
                 if let quality = library.current?.quality, quality.lossless { Button { showQuality = true } label: { Label("无损", systemImage: "waveform").font(.caption.weight(.semibold)).padding(.horizontal, 12).padding(.vertical, 6) }.buttonStyle(.plain).foregroundStyle(.white).glassEffect(.clear, in: .capsule) }
@@ -164,7 +164,7 @@ struct NowPlayingView: View {
 }
 
 private struct SystemVolume: UIViewRepresentable {
-    func makeUIView(context: Context) -> MPVolumeView { let view = MPVolumeView(); view.showsRouteButton = false; view.tintColor = .white; return view }
+    func makeUIView(context: Context) -> MPVolumeView { let view = TranslucentVolumeView(); view.showsRouteButton = false; view.tintColor = .white; return view }
     func updateUIView(_ uiView: MPVolumeView, context: Context) {}
 }
 private struct AudioRoute: UIViewRepresentable {
@@ -195,4 +195,48 @@ private struct LoopingCover: UIViewRepresentable {
         }
         func stop() { queue?.pause(); looper?.disableLooping(); queue?.removeAllItems(); (layer as? AVPlayerLayer)?.player = nil; looper = nil; queue = nil; url = nil }
     }
+}
+
+// Keep native tracking and accessibility; only soften the idle thumb tint.
+private struct PlaybackSlider: UIViewRepresentable {
+    @Binding var value: Double
+    var maximum: Double
+    var editing: (Bool) -> Void
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeUIView(context: Context) -> UISlider {
+        let slider = UISlider()
+        slider.minimumTrackTintColor = .white.withAlphaComponent(0.8)
+        slider.maximumTrackTintColor = .white.withAlphaComponent(0.2)
+        slider.thumbTintColor = .white.withAlphaComponent(0.3)
+        slider.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .valueChanged)
+        slider.addTarget(context.coordinator, action: #selector(Coordinator.started(_:)), for: .touchDown)
+        slider.addTarget(context.coordinator, action: #selector(Coordinator.ended(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        return slider
+    }
+    func updateUIView(_ slider: UISlider, context: Context) {
+        context.coordinator.owner = self
+        slider.maximumValue = Float(maximum)
+        if !slider.isTracking { slider.value = Float(value) }
+    }
+    final class Coordinator: NSObject {
+        var owner: PlaybackSlider
+        init(_ owner: PlaybackSlider) { self.owner = owner }
+        @objc func started(_ slider: UISlider) { slider.thumbTintColor = nil; owner.editing(true) }
+        @objc func changed(_ slider: UISlider) {
+            owner.value = Double(slider.value)
+            if !slider.isTracking { owner.editing(false) }
+        }
+        @objc func ended(_ slider: UISlider) { owner.value = Double(slider.value); owner.editing(false); slider.thumbTintColor = .white.withAlphaComponent(0.3) }
+    }
+}
+private final class TranslucentVolumeView: MPVolumeView {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        for slider in subviews.compactMap({ $0 as? UISlider }) {
+            slider.thumbTintColor = slider.isTracking ? nil : .white.withAlphaComponent(0.3)
+            slider.removeTarget(self, action: #selector(updateThumb(_:)), for: [.touchDown, .touchUpInside, .touchUpOutside, .touchCancel])
+            slider.addTarget(self, action: #selector(updateThumb(_:)), for: [.touchDown, .touchUpInside, .touchUpOutside, .touchCancel])
+        }
+    }
+    @objc private func updateThumb(_ slider: UISlider) { slider.thumbTintColor = slider.isTracking ? nil : .white.withAlphaComponent(0.3) }
 }

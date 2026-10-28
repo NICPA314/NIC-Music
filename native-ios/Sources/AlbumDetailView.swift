@@ -16,7 +16,7 @@ struct AlbumDetailView: View {
             if let first = songs.first {
                 VStack(spacing: 18) {
                     Cover(song: first).aspectRatio(1, contentMode: .fit).frame(maxWidth: 280).shadow(color: .black.opacity(0.12), radius: 14, y: 6)
-                        .contextMenu { Button("自定封面", systemImage: "photo") { chooseCover = true }; Button("喜爱专辑歌曲", systemImage: "star") { for song in songs where song.favorite != true { library.toggleFavorite(song.id) } } }
+                        .contextMenu { Button("自定封面", systemImage: "photo") { chooseCover = true }; Button("重新读取歌曲信息", systemImage: "arrow.clockwise") { Task { await library.refreshAlbumMetadata(albumKey) } }; Button("喜爱专辑歌曲", systemImage: "star") { for song in songs where song.favorite != true { library.toggleFavorite(song.id) } } }
                     VStack(spacing: 5) {
                         Text(first.albumTitle).font(.title2.bold()).multilineTextAlignment(.center)
                         NavigationLink(first.albumArtist ?? first.artist) { ArtistDetailView(artist: first.albumArtist ?? first.artist) }.font(.title3)

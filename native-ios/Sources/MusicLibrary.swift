@@ -308,6 +308,24 @@ struct Song: Identifiable, Codable, Equatable {
         try JSONEncoder().encode(updated).write(to: folder.appendingPathComponent("artist-artwork.json"), options: .atomic)
         artistArtworkFiles = updated; artistArtwork[artist] = image.preview
     }
+    func refreshAlbumMetadata(_ albumKey: String) async {
+        let ids = librarySongs.filter { $0.albumKey == albumKey }.map(\.id)
+        for id in ids {
+            guard let song = songs.first(where: { $0.id == id }) else { continue }
+            do {
+                let tags = try await MusicFileImporter.metadata(at: folder.appendingPathComponent(song.filename))
+                guard let i = songs.firstIndex(where: { $0.id == id }) else { continue }
+                if let title = tags.title { songs[i].title = title }
+                if let artist = tags.artist { songs[i].artist = artist }
+                songs[i].album = tags.album; songs[i].albumArtist = tags.albumArtist
+                if songs[i].libraryAlbumKey?.hasPrefix("folder:") != true {
+                    songs[i].libraryAlbumKey = nil; songs[i].libraryAlbumTitle = nil
+                }
+                save()
+            } catch { self.error = "歌曲信息读取失败：\(error.localizedDescription)" }
+        }
+        nowPlaying()
+    }
     func setAlbumArtwork(_ source: URL, albumKey: String) async {
         guard !importingAttachment, let first = librarySongs.first(where: { $0.albumKey == albumKey }) else { return }
         importingAttachment = true
