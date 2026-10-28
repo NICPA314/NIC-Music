@@ -1,6 +1,42 @@
 import XCTest
 
 final class DocumentPickerTests: XCTestCase {
+    @MainActor func testSelectFolderImportsAllSongs() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        let addButton = app.buttons["import-music"].firstMatch
+        XCTAssertTrue(addButton.waitForExistence(timeout: 15)); addButton.tap()
+        app.buttons["导入文件夹"].tap()
+        let browse = app.buttons["Browse"].firstMatch
+        XCTAssertTrue(browse.waitForExistence(timeout: 60)); browse.tap()
+        let local = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "On My iPhone")).firstMatch
+        if !local.waitForExistence(timeout: 5) {
+            let back = app.navigationBars.buttons["Browse"].firstMatch
+            if back.exists { back.tap() }
+        }
+        XCTAssertTrue(local.waitForExistence(timeout: 10)); local.tap()
+        let appFolder = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "NIC Music")).firstMatch
+        XCTAssertTrue(appFolder.waitForExistence(timeout: 10)); appFolder.tap()
+        let samples = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Import Samples")).firstMatch
+        XCTAssertTrue(samples.waitForExistence(timeout: 10)); samples.tap()
+        // Folder selection must work without selecting an individual audio file.
+        let finish = app.buttons["Open"].firstMatch
+        XCTAssertTrue(finish.waitForExistence(timeout: 15))
+        XCTAssertTrue(finish.isEnabled); finish.tap()
+        let result = app.alerts["导入结果"]
+        XCTAssertTrue(result.waitForExistence(timeout: 45))
+        XCTAssertFalse(result.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "失败")).firstMatch.exists)
+        result.buttons["好"].tap()
+        app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "歌曲")).firstMatch.tap()
+        for title in ["Metadata Title", "Second Track", "Third Track"] {
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch.waitForExistence(timeout: 10))
+        }
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "folder-import-three-tracks"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
+
     @MainActor func testSelectFileImportAndPlay() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

@@ -8,9 +8,12 @@ import UniformTypeIdentifiers
 
 struct LibraryRoot: View {
     @Environment(MusicLibrary.self) private var library
-    @State private var showImporter = false
-    @State private var importFolder = false
-    @State private var importPlaylistID: UUID?
+    @State private var importRequest: ImportRequest?
+    private struct ImportRequest: Identifiable {
+        let id = UUID()
+        let folder: Bool
+        let playlistID: UUID?
+    }
     @State private var newPlaylist = false
     @State private var playlistName = ""
     @State private var presented: Song?
@@ -56,10 +59,10 @@ struct LibraryRoot: View {
             }
         }
         .sheet(item: $presented) { _ in NowPlayingView().environment(library) }
-        .sheet(isPresented: $showImporter) {
-            DocumentImportPicker(types: importFolder ? [.folder] : [.audio], multiple: !importFolder) { urls in
-                showImporter = false
-                importSelection(urls, folder: importFolder, playlistID: importPlaylistID)
+        .sheet(item: $importRequest) { request in
+            DocumentImportPicker(types: request.folder ? [.folder] : [.audio], multiple: !request.folder) { urls in
+                importRequest = nil
+                importSelection(urls, folder: request.folder, playlistID: request.playlistID)
             }
         }
         .safeAreaInset(edge: .top) { if library.importing { HStack { ProgressView(); Text(library.importProgress).font(.footnote).lineLimit(2) }.padding(12).frame(maxWidth: .infinity).background(.regularMaterial).accessibilityIdentifier("import-progress") } }
@@ -73,7 +76,9 @@ struct LibraryRoot: View {
             Button("导入文件夹", systemImage: "folder") { startImport(folder: true) }
         } label: { Label("导入音乐", systemImage: "plus") }.disabled(library.importing).accessibilityIdentifier("import-music")
     }
-    private func startImport(folder: Bool, playlistID: UUID? = nil) { importFolder = folder; importPlaylistID = playlistID; showImporter = true }
+    private func startImport(folder: Bool, playlistID: UUID? = nil) {
+        importRequest = ImportRequest(folder: folder, playlistID: playlistID)
+    }
     private func importSelection(_ urls: [URL], folder: Bool, playlistID: UUID?) {
         ImportDiagnostics.record("selection received \(urls.count), folder=\(folder)")
         // The document picker can dismiss itself before its delegate delivers URLs.
