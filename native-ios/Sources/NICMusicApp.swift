@@ -52,7 +52,7 @@ struct LibraryRoot: View {
         }
 
         .modifier(PlayerAccessory(enabled: library.current != nil, accessory: bottomDock))
-        .sheet(item: $presented) { _ in NowPlayingView().environment(library).presentationDetents([.large]).presentationDragIndicator(.hidden) }
+        .fullScreenCover(item: $presented) { _ in NowPlayingView().environment(library) }
         .background {
             if let request = importRequest { DocumentImportPicker(types: request.folder ? [.folder] : [.audio], multiple: !request.folder) { urls in
                 library.pendingSelectionID = nil

@@ -72,6 +72,11 @@ final class DocumentPickerTests: XCTestCase {
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Third Track")).firstMatch.exists)
         let searchImage = XCTAttachment(screenshot: app.screenshot())
         searchImage.name = "search-filtered-results"; searchImage.lifetime = .keepAlways; add(searchImage)
+        // Dismiss the keyboard through blank content before using the native tabs.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap()
+        let keyboardGone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+        XCTAssertEqual(XCTWaiter.wait(for: [keyboardGone], timeout: 10), .completed)
+        XCTAssertTrue(field.exists)
         app.tabBars.buttons["资料库"].tap()
         let back = app.navigationBars.buttons["资料库"].firstMatch
         if back.exists { back.tap() }
@@ -143,5 +148,9 @@ final class DocumentPickerTests: XCTestCase {
         // Native controls appear before WKWebView and its first GPU frame are
         // ready. Keep the app alive until the actual renderer acknowledges it.
         XCTAssertTrue(app.webViews["amll-background-ready"].firstMatch.waitForExistence(timeout: 30))
+        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12))
+        let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+        from.press(forDuration: 0.1, thenDragTo: to)
+        XCTAssertTrue(app.buttons["mini-player"].waitForExistence(timeout: 10))
     }
 }

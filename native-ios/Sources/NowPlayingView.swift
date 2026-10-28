@@ -9,6 +9,7 @@ struct NowPlayingView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var mode = 0
+    @State private var dismissOffset: CGFloat = 0
     @State private var showQuality = false
     @State private var attachment: AttachmentImport?
     @State private var scrub = 0.0
@@ -78,8 +79,18 @@ struct NowPlayingView: View {
                             Spacer()
                             Button { mode = mode == 2 ? 0 : 2 } label: { Image(systemName: "list.bullet").frame(width: 44, height: 44).background(mode == 2 ? .white.opacity(0.22) : .clear, in: Circle()) }.accessibilityLabel("待播歌曲")
                         }.font(.system(size: 24, weight: .semibold)).buttonStyle(.plain).padding(.horizontal, 36).padding(.bottom, 12)
-                    }.padding(.horizontal, 28).padding(.top, 6)
+                    }.padding(.horizontal, 28).padding(.top, 6).offset(y: dismissOffset)
                 }.foregroundStyle(.white).preferredColorScheme(.dark)
+                    .simultaneousGesture(DragGesture(minimumDistance: 20)
+                        .onChanged { value in
+                            guard mode == 0 || value.startLocation.y < 110,
+                                  value.translation.height > abs(value.translation.width) else { return }
+                            dismissOffset = max(0, value.translation.height)
+                        }
+                        .onEnded { value in
+                            if dismissOffset > 100 || (dismissOffset > 30 && value.predictedEndTranslation.height > 220) { dismiss() }
+                            else { withAnimation(.snappy) { dismissOffset = 0 } }
+                        })
             }
         }
         .sheet(item: $attachment) { request in
