@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: native-ios-${{ github.ref }}
+  group: nic-music-ios-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
