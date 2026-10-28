@@ -82,7 +82,9 @@ final class DocumentPickerTests: XCTestCase {
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "导入文件夹可")).firstMatch.exists)
         XCTAssertFalse(app.buttons["复制导入诊断"].exists)
         XCTAssertFalse(app.staticTexts["导入"].exists)
-        XCTAssertTrue(app.staticTexts["0.2.2 (6)"].waitForExistence(timeout: 10))
+        // LabeledContent exposes its displayed value in the combined row label.
+        let version = app.staticTexts.matching(NSPredicate(format: "label == %@", "版本, 0.2.2 (6)")).firstMatch
+        XCTAssertTrue(version.waitForExistence(timeout: 10))
         let settingsImage = XCTAttachment(screenshot: app.screenshot())
         settingsImage.name = "settings-about-version"; settingsImage.lifetime = .keepAlways; add(settingsImage)
     }
