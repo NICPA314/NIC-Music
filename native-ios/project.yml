@@ -5,8 +5,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: '5.0'
-    MARKETING_VERSION: '0.1.0'
-    CURRENT_PROJECT_VERSION: '1'
+    MARKETING_VERSION: '0.2.0'
+    CURRENT_PROJECT_VERSION: '2'
     CODE_SIGNING_ALLOWED: NO
     TARGETED_DEVICE_FAMILY: '1,2'
 targets:
@@ -32,4 +32,25 @@ targets:
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
-    scheme: {}
+  NICMusicTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+        excludes: [Fixtures, make_fixtures.py]
+      - path: Tests/Fixtures
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - target: NICMusic
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  NICMusic:
+    build:
+      targets:
+        NICMusic: all
+        NICMusicTests: [test]
+    test:
+      targets: [NICMusicTests]

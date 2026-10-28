@@ -1,6 +1,9 @@
 name: Native iOS IPA
 on:
   workflow_dispatch:
+  push:
+    branches: [native-ios]
+    paths: ['native-ios/**', '.github/workflows/native-ios.yml']
 permissions:
   contents: read
 concurrency:
@@ -40,8 +43,8 @@ jobs:
           ditto build/device/Build/Products/Release-iphoneos/NICMusic.app build/package/Payload/NICMusic.app
           test -f build/package/Payload/NICMusic.app/dist/index.html
           cd build/package
-          zip -qry NIC-Music-0.1.0-Test-Unsigned.ipa Payload
-          unzip -t NIC-Music-0.1.0-Test-Unsigned.ipa
+          zip -qry NIC-Music-0.2.0-Test-Unsigned.ipa Payload
+          unzip -t NIC-Music-0.2.0-Test-Unsigned.ipa
           shasum -a 256 *.ipa > SHA256.txt
       - name: Simulator launch proof
         working-directory: native-ios
@@ -57,6 +60,12 @@ jobs:
           xcrun simctl ui "$DEVICE" appearance dark
           sleep 2
           xcrun simctl io "$DEVICE" screenshot build/library-dark.png
+      - name: Verify import, metadata, album grouping, independent copies and playback
+        working-directory: native-ios
+        run: |
+          set -euo pipefail
+          DEVICE=$(xcrun simctl list devices booted -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for v in d["devices"].values() for x in v if x["state"] == "Booted"))')
+          xcodebuild test -project NICMusic.xcodeproj -scheme NICMusic -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/simulator -resultBundlePath build/ImportTests.xcresult CODE_SIGNING_ALLOWED=NO > build-tests.log 2>&1 || { tail -150 build-tests.log; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: NIC-Music-iOS
@@ -64,6 +73,7 @@ jobs:
             native-ios/build/package/*.ipa
             native-ios/build/package/SHA256.txt
             native-ios/build/library-*.png
+            native-ios/build/ImportTests.xcresult
           retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
