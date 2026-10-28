@@ -255,10 +255,18 @@ struct Song: Identifiable, Codable, Equatable {
             let previous = songs[i].videoFilename
             let previousArtwork = songs[i].artworkFilename
             let artwork = try await MusicFileImporter.shared.storeArtwork(thumbnail, beside: songs[i].filename, in: folder)
+            importedArtwork = artwork
+            var videoFilename: String?
+            if video {
+                let location = songs[i].filename.split(separator: "/").dropLast().map(String.init)
+                let name = URL(fileURLWithPath: songs[i].filename).deletingPathExtension().lastPathComponent + ".cover.mp4"
+                videoFilename = try await MusicFileImporter.shared.place(file.lastPathComponent, in: folder, location: location, originalName: name)
+                importedURL = folder.appendingPathComponent(videoFilename!)
+            }
             var updated = songs
             updated[i].artwork = thumbnail; updated[i].customArtwork = true
-            importedArtwork = artwork; updated[i].artworkFilename = artwork
-            updated[i].videoFilename = video ? file.lastPathComponent : nil
+            updated[i].artworkFilename = artwork
+            updated[i].videoFilename = videoFilename
             try persist(updated); songs = updated
             if !video { try? FileManager.default.removeItem(at: file) }
             if let previous { try? FileManager.default.removeItem(at: folder.appendingPathComponent(previous)) }

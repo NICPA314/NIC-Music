@@ -42,7 +42,21 @@ import AVFoundation
         library.pause()
         let reloaded = MusicLibrary(folder: library.folder)
         XCTAssertEqual(reloaded.songs.first?.title, "Metadata Title")
+        XCTAssertEqual(reloaded.songs.first?.artwork, song.artwork)
+        XCTAssertNotNil(reloaded.songs.first?.artworkFilename)
         XCTAssertTrue(FileManager.default.fileExists(atPath: library.folder.appendingPathComponent(song.filename).path))
+        XCTAssertEqual(try Data(contentsOf: library.folder.appendingPathComponent(song.filename)), try Data(contentsOf: fixture("01. Wrong Filename")))
+    }
+    func testMissingTitleDoesNotUseFilename() async throws {
+        var data = try Data(contentsOf: fixture("01. Wrong Filename"))
+        let titleKey = Data([0xA9, 0x6E, 0x61, 0x6D])
+        let range = try XCTUnwrap(data.range(of: titleKey))
+        data.replaceSubrange(range, with: Data("xxxx".utf8))
+        let source = root.appendingPathComponent("Do Not Use This Filename.m4a")
+        try data.write(to: source)
+        await library.importSongs([source])
+        XCTAssertTrue(library.songs.isEmpty)
+        XCTAssertTrue(library.importSummary?.contains("歌曲标题元数据") == true)
     }
     func testMixedBatchReportsFailureAndDoesNotLeaveBadCopy() async throws {
         let invalid = root.appendingPathComponent("bad.m4a")
@@ -117,5 +131,23 @@ import AVFoundation
         XCTAssertTrue(library.importSummary?.contains("1 个文件失败") == true)
         let files = try await MusicFileImporter.shared.audioFiles(in: library.folder)
         XCTAssertTrue(files.isEmpty)
+    }
+    func testVideoAndStaticCoversAreStoredIndependentlyOfSource() async throws {
+        await library.importSongs([fixture("01. Wrong Filename")])
+        let id = try XCTUnwrap(library.songs.first?.id)
+        let video = Bundle(for: Self.self).url(forResource: "cover", withExtension: "mp4", subdirectory: "Fixtures")!
+        let source = try copy(video, to: "Source/cover.mp4")
+        await library.addCover(source, video: true, to: id)
+        let filename = try XCTUnwrap(library.songs.first?.videoFilename, library.error ?? "")
+        XCTAssertTrue(filename.hasPrefix("Albums/"))
+        try FileManager.default.removeItem(at: source)
+        let asset = AVURLAsset(url: library.folder.appendingPathComponent(filename))
+        let playable = try await asset.load(.isPlayable)
+        XCTAssertTrue(playable)
+        let image = Bundle(for: Self.self).url(forResource: "cover", withExtension: "png", subdirectory: "Fixtures")!
+        await library.addCover(image, video: false, to: id)
+        XCTAssertNil(library.songs.first?.videoFilename)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: library.folder.appendingPathComponent(filename).path))
+        XCTAssertEqual(library.songs.first?.title, "Metadata Title")
     }
 }

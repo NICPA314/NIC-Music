@@ -63,7 +63,7 @@ actor MusicFileImporter {
             guard let title = tags.title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw ImportError.missingTitle
             }
-            var artwork = tags.artwork
+            var artwork = tags.artwork.flatMap { UIImage(data: $0) == nil ? nil : $0 }
             var lyrics: String?, lyricKind: String?
             if companions {
                 let siblings = try FileManager.default.contentsOfDirectory(at: source.deletingLastPathComponent(), includingPropertiesForKeys: nil)
@@ -122,7 +122,7 @@ actor MusicFileImporter {
         defer { timeout.cancel() }
         var items = (try? await asset.load(.commonMetadata)) ?? []
         // Some containers expose tags only in their native metadata format.
-        for format in try await asset.load(.availableMetadataFormats) {
+        for format in (try? await asset.load(.availableMetadataFormats)) ?? [] {
             if let native = try? await asset.loadMetadata(for: format) { items += native }
         }
         var tags = EmbeddedTags()

@@ -90,7 +90,7 @@ struct LibraryRoot: View {
         }
     }
     @ViewBuilder private var libraryContent: some View {
-        if library.librarySongs.isEmpty { songList([]) }
+        if library.librarySongs.isEmpty { songList([], libraryEmpty: true) }
         else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -155,8 +155,8 @@ struct LibraryRoot: View {
             Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }.foregroundStyle(.primary)
     }
-    @ViewBuilder private func songList(_ songs: [Song]) -> some View {
-        if songs.isEmpty && library.songs.isEmpty {
+    @ViewBuilder private func songList(_ songs: [Song], libraryEmpty: Bool = false) -> some View {
+        if libraryEmpty || (songs.isEmpty && library.songs.isEmpty) {
             ContentUnavailableView {
                 Label("音乐", systemImage: "music.note")
             } description: { Text("导入喜欢的歌曲。") } actions: {
