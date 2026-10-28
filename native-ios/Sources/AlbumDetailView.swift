@@ -16,14 +16,13 @@ struct AlbumDetailView: View {
             if let first = songs.first {
                 VStack(spacing: 18) {
                     Cover(song: first).aspectRatio(1, contentMode: .fit).frame(maxWidth: 280).shadow(color: .black.opacity(0.12), radius: 14, y: 6)
-                        .contextMenu { Button("自定封面", systemImage: "photo") { chooseCover = true } }
+                        .contextMenu { Button("自定封面", systemImage: "photo") { chooseCover = true }; Button("喜爱专辑歌曲", systemImage: "star") { for song in songs where song.favorite != true { library.toggleFavorite(song.id) } } }
                     VStack(spacing: 5) {
                         Text(first.albumTitle).font(.title2.bold()).multilineTextAlignment(.center)
                         NavigationLink(first.albumArtist ?? first.artist) { ArtistDetailView(artist: first.albumArtist ?? first.artist) }.font(.title3)
                         Text([first.genre, first.releaseDate].compactMap { $0 }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
                     }
                     Button("播放", systemImage: "play.fill") { library.play(first, queue: songs) }.buttonStyle(ClearGlassButtonStyle())
-                    Button("自定封面", systemImage: "photo") { chooseCover = true }.font(.subheadline).disabled(library.importingAttachment)
                     VStack(spacing: 0) {
                         ForEach(songs) { song in
                             Button { library.play(song, queue: songs) } label: {
@@ -33,7 +32,7 @@ struct AlbumDetailView: View {
                                     Spacer()
                                     if library.currentID == song.id { Image(systemName: "waveform") }
                                 }.padding(.vertical, 14).contentShape(Rectangle())
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.plain).contextMenu { Button(song.favorite == true ? "取消喜爱" : "喜爱", systemImage: "star") { library.toggleFavorite(song.id) }; Button("播放", systemImage: "play.fill") { library.play(song, queue: songs) } }
                             Divider()
                         }
                     }
@@ -71,7 +70,7 @@ struct ArtistDetailView: View {
                     if let data = library.artistArtwork[artist], let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill() }
                     else { Circle().fill(.quaternary).overlay { Image(systemName: "person.fill").font(.system(size: 70)).foregroundStyle(.secondary) } }
                 }.frame(width: 180, height: 180).clipShape(Circle())
-                Button("自定头像") { importing = true }.font(.subheadline)
+                    .contextMenu { Button("自定头像", systemImage: "person.crop.circle.badge.plus") { importing = true } }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], spacing: 22) {
                     ForEach(albums) { album in
                         NavigationLink { AlbumDetailView(albumKey: album.id) } label: {

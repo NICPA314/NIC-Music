@@ -1,15 +1,20 @@
-import { LyricPlayer, BackgroundRender, MeshGradientRenderer, type LyricLine } from '@applemusic-like-lyrics/core';
+import { LyricPlayer, BackgroundRender, MeshGradientRenderer, type LyricLine, type LyricLineMouseEvent } from '@applemusic-like-lyrics/core';
 import { parseLrc } from '@applemusic-like-lyrics/lyric';
 import { handleTTMLParsing } from './ttml-parser';
 import '@applemusic-like-lyrics/core/style.css';
 import './style.css';
 const player = new LyricPlayer();
 player.pause();
+player.setLyricProcessConfig({ tryAdvanceStartTime: true });
 if (matchMedia('(prefers-reduced-motion: reduce)').matches) { player.setEnableSpring(false); player.setEnableScale(false); }
 document.body.appendChild(player.getElement());
 let time = 0, playing = false, stamp = performance.now(), last = stamp;
 let original: LyricLine[] = [], translation = true, pronunciation = true;
 const send = (payload: object) => (window as any).webkit?.messageHandlers?.lyrics?.postMessage(payload);
+player.addEventListener('line-click', (event: Event) => {
+  const line = original[(event as LyricLineMouseEvent).lineIndex];
+  if (line) send({ event: 'seek', time: line.words[0]?.startTime ?? line.startTime });
+});
 let ambient: BackgroundRender<MeshGradientRenderer> | undefined;
 let ambientOnly = false, ambientActive = false, ambientReduced = false, ambientEnergy = 0;
 let ambientMoving: boolean | undefined;

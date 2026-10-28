@@ -33,9 +33,9 @@ struct DocumentImportPicker: UIViewControllerRepresentable {
             super.viewDidAppear(animated)
             guard !started else { return }
             started = true
-            // Directory descendants require open mode. Files use import-copy
-            // mode instead of asking the provider for an in-place document.
-            let copy = !types.contains(.folder)
+            // Import a provider-owned copy, including directory contents, instead
+            // of requesting an in-place security-scoped handoff.
+            let copy = true
             let controller = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: copy)
             controller.allowsMultipleSelection = multiple
             controller.delegate = self

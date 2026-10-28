@@ -90,23 +90,22 @@ struct PlaylistDetailView: View {
             if let playlist {
                 VStack(spacing: 18) {
                     PlaylistCover(playlist: playlist, artwork: library.playlistArtwork[playlistID]).aspectRatio(1, contentMode: .fit).frame(maxWidth: 280)
-                    Text(playlist.name).font(.title2.bold()).multilineTextAlignment(.center)
-                    Text("\(songs.count) 首歌曲").foregroundStyle(.secondary).font(.subheadline)
-                    Menu {
+                        .contextMenu {
                         Button("选择封面", systemImage: "photo") { chooseCover = true }
                         Button(playlist.pinned == true ? "取消置顶" : "置顶到资料库", systemImage: playlist.pinned == true ? "pin.slash" : "pin") { library.togglePlaylistPin(playlistID) }
                         if playlist.artworkFilename != nil {
                             Button("使用默认封面", systemImage: "arrow.counterclockwise") { Task { await library.setPlaylistArtwork(nil, playlistID: playlistID) } }
                         }
-                    } label: { Label("编辑封面", systemImage: "photo").padding(.horizontal, 20).frame(height: 48).glassEffect(.clear.interactive(), in: .capsule) }
-                        .buttonStyle(.plain).disabled(savingCover)
+                        }
+                    Text(playlist.name).font(.title2.bold()).multilineTextAlignment(.center)
+                    Text("\(songs.count) 首歌曲").foregroundStyle(.secondary).font(.subheadline)
                     if savingCover { ProgressView() }
                     if let first = songs.first {
                         Button("播放", systemImage: "play.fill") { library.play(first, queue: songs) }.buttonStyle(ClearGlassButtonStyle())
                     } else {
                         Menu {
-                            Button("选择音乐文件") { onImport(false) }
-                            Button("导入文件夹") { onImport(true) }
+                            Button("选择音乐文件", systemImage: "music.note") { onImport(false) }
+                            Button("导入文件夹", systemImage: "folder") { onImport(true) }
                         } label: { Label("导入音乐", systemImage: "plus").font(.headline).padding(.horizontal, 24).frame(height: 56).glassEffect(.clear.interactive(), in: .capsule) }.buttonStyle(.plain)
                     }
                     LazyVStack(spacing: 0) {
@@ -128,9 +127,9 @@ struct PlaylistDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button("选择音乐文件") { onImport(false) }
-                    Button("导入文件夹") { onImport(true) }
-                } label: { Image(systemName: "plus").frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }.buttonStyle(.plain).disabled(library.importing)
+                    Button("选择音乐文件", systemImage: "music.note") { onImport(false) }
+                    Button("导入文件夹", systemImage: "folder") { onImport(true) }
+                } label: { Image(systemName: "plus").frame(width: 44, height: 44) }.glassEffect(.clear.interactive(), in: .circle).buttonStyle(.plain).disabled(library.importing)
             }.sharedBackgroundVisibility(.hidden)
         }
         .sheet(isPresented: $chooseCover) {

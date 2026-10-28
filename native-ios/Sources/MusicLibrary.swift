@@ -283,8 +283,8 @@ struct Song: Identifiable, Codable, Equatable {
             playlists = updated
         } catch { self.error = "播放列表置顶失败：\(error.localizedDescription)" }
     }
-    func toggleFavorite() {
-        guard let i = songs.firstIndex(where: { $0.id == currentID }) else { return }
+    func toggleFavorite(_ id: UUID? = nil) {
+        guard let i = songs.firstIndex(where: { $0.id == (id ?? currentID) }) else { return }
         songs[i].favorite = !(songs[i].favorite ?? false); save()
     }
     func setArtistArtwork(_ url: URL, artist: String) async {
@@ -349,8 +349,23 @@ struct Song: Identifiable, Codable, Equatable {
     func pause() { player?.pause(); playing = false; audioEnergy = 0; nowPlaying() }
     func toggle() { playing ? pause() : resume() }
     func seek(_ seconds: Double) { player?.currentTime = min(max(seconds,0),duration); position = player?.currentTime ?? 0; nowPlaying() }
-    func next(_ step: Int) { let ordered = queue; guard let i = ordered.firstIndex(where: { $0.id == currentID }), !ordered.isEmpty else { return }; play(ordered[(i+step+ordered.count)%ordered.count]) }
-    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) { Task { @MainActor in if flag { self.next(1) } else { self.pause() } } }
+    enum PlaybackMode: String, CaseIterable { case sequential = "顺序播放", random = "随机播放", repeatAll = "列表循环", repeatOne = "单曲循环" }
+    var playbackMode: PlaybackMode = .sequential
+    private var randomRemaining: [UUID] = []
+    func changePlaybackMode(_ mode: PlaybackMode) { playbackMode = mode; randomRemaining = [] }
+    private func advanceAfterFinish() {
+        if playbackMode == .repeatOne { seek(0); resume(); return }
+        if playbackMode == .sequential, queue.last?.id == currentID { pause(); return }
+        next(1)
+    }
+    func next(_ step: Int) {
+        if playbackMode == .random, step > 0 {
+            if randomRemaining.isEmpty { randomRemaining = queue.map(\.id).filter { $0 != currentID }.shuffled() }
+            if let id = randomRemaining.popLast(), let song = songs.first(where: { $0.id == id }) { play(song) }
+            return
+        }
+ let ordered = queue; guard let i = ordered.firstIndex(where: { $0.id == currentID }), !ordered.isEmpty else { return }; play(ordered[(i+step+ordered.count)%ordered.count]) }
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) { Task { @MainActor in if flag { self.advanceAfterFinish() } else { self.pause() } } }
     func addLyrics(_ url: URL, to id: UUID) async {
         guard !importingAttachment else { return }
         importingAttachment = true

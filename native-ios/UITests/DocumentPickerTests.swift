@@ -16,7 +16,7 @@ final class DocumentPickerTests: XCTestCase {
             XCTAssertFalse(app.alerts["无法完成操作"].exists)
             XCTAssertFalse(app.alerts["导入结果"].exists)
         }
-        app.buttons["albums-tab"].tap()
+        app.tabBars.buttons["专辑"].tap()
         XCTAssertFalse(app.buttons["导入文件夹"].exists)
         XCTAssertFalse(app.buttons["导入专辑文件夹"].exists)
     }
@@ -60,7 +60,7 @@ final class DocumentPickerTests: XCTestCase {
         }
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "folder-import-three-tracks"; screenshot.lifetime = .keepAlways; add(screenshot)
-        let search = app.buttons["search-tab"]
+        let search = app.tabBars.buttons["搜索"]
         XCTAssertTrue(search.exists)
         XCTAssertFalse(app.tabBars.firstMatch.exists, "Only the custom clear-glass dock should be visible")
         XCTAssertGreaterThan(search.frame.midX, app.frame.width * 0.8)
@@ -72,7 +72,7 @@ final class DocumentPickerTests: XCTestCase {
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Third Track")).firstMatch.exists)
         let searchImage = XCTAttachment(screenshot: app.screenshot())
         searchImage.name = "search-filtered-results"; searchImage.lifetime = .keepAlways; add(searchImage)
-        app.buttons["library-tab"].tap()
+        app.tabBars.buttons["资料库"].tap()
         let back = app.navigationBars.buttons["资料库"].firstMatch
         if back.exists { back.tap() }
         let settings = app.buttons["设置"].firstMatch
@@ -83,7 +83,7 @@ final class DocumentPickerTests: XCTestCase {
         XCTAssertFalse(app.buttons["复制导入诊断"].exists)
         XCTAssertFalse(app.staticTexts["导入"].exists)
         // LabeledContent exposes its displayed value in the combined row label.
-        let version = app.staticTexts.matching(NSPredicate(format: "label == %@", "版本, 0.2.2 (6)")).firstMatch
+        let version = app.staticTexts.matching(NSPredicate(format: "label == %@", "版本, 0.2.3")).firstMatch
         XCTAssertTrue(version.waitForExistence(timeout: 10))
         let settingsImage = XCTAttachment(screenshot: app.screenshot())
         settingsImage.name = "settings-about-version"; settingsImage.lifetime = .keepAlways; add(settingsImage)

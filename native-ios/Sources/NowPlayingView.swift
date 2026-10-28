@@ -9,6 +9,7 @@ struct NowPlayingView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var mode = 0
+    @State private var showQuality = false
     @State private var attachment: AttachmentImport?
     @State private var scrub = 0.0
     @State private var scrubbing = false
@@ -39,6 +40,11 @@ struct NowPlayingView: View {
                         } else if mode == 2 {
                             ScrollView {
                                 LazyVStack(alignment: .leading, spacing: 16) {
+                                    Menu {
+                                        ForEach(MusicLibrary.PlaybackMode.allCases, id: \.self) { value in
+                                            Button(value.rawValue, systemImage: value == .random ? "shuffle" : value == .repeatOne ? "repeat.1" : value == .repeatAll ? "repeat" : "list.bullet") { library.changePlaybackMode(value) }
+                                        }
+                                    } label: { Label(library.playbackMode.rawValue, systemImage: "arrow.triangle.2.circlepath").font(.headline) }
                                     Text("继续播放").font(.title2.bold())
                                     ForEach(library.queue) { item in
                                         Button { library.play(item) } label: {
@@ -71,7 +77,7 @@ struct NowPlayingView: View {
                             AudioRoute().frame(width: 44, height: 44)
                             Spacer()
                             Button { mode = mode == 2 ? 0 : 2 } label: { Image(systemName: "list.bullet").frame(width: 44, height: 44).background(mode == 2 ? .white.opacity(0.22) : .clear, in: Circle()) }.accessibilityLabel("待播歌曲")
-                        }.font(.title2).buttonStyle(.plain).padding(.horizontal, 36).padding(.bottom, 12)
+                        }.font(.system(size: 24, weight: .semibold)).buttonStyle(.plain).padding(.horizontal, 36).padding(.bottom, 12)
                     }.padding(.horizontal, 28).padding(.top, 6)
                 }.foregroundStyle(.white).preferredColorScheme(.dark)
             }
@@ -87,6 +93,7 @@ struct NowPlayingView: View {
             }
         }
         .alert("无法完成操作", isPresented: Binding(get: { library.error != nil }, set: { if !$0 { library.error = nil } })) { Button("好") { library.error = nil } } message: { Text(library.error ?? "") }
+        .alert("音频格式", isPresented: $showQuality) { Button("好", role: .cancel) {} } message: { Text(library.current?.quality?.description ?? "") }
         .onChange(of: library.currentID) { hasTranslation = false; hasPronunciation = false }
     }
     private func background(_ song: Song) -> some View {
@@ -99,7 +106,7 @@ struct NowPlayingView: View {
                        onError: { _ in ImportDiagnostics.record("AMLL background unavailable; showing static artwork") })
                 .id(song.id.uuidString + (song.artworkFilename ?? ""))
                 .allowsHitTesting(false)
-            Color.black.opacity(0.35)
+            Color.black.opacity(0.45)
             if mode == 0, let filename = song.videoFilename {
                 LoopingCover(url: library.folder.appendingPathComponent(filename), active: library.playing && scenePhase == .active && !reduceMotion)
                     .frame(width: size.width, height: size.height * 0.72)
@@ -117,29 +124,28 @@ struct NowPlayingView: View {
                 Text(song.title).font(compact ? .headline : .title2.bold()).lineLimit(1)
                 Text(song.artist).font(compact ? .subheadline : .title3).foregroundStyle(.white.opacity(0.65)).lineLimit(1)
             }.frame(maxWidth: .infinity, alignment: .leading)
-            Button { library.toggleFavorite() } label: { Image(systemName: song.favorite == true ? "star.fill" : "star").font(.title2) }.accessibilityLabel(song.favorite == true ? "取消喜爱" : "喜爱")
+            Button { library.toggleFavorite() } label: { Image(systemName: song.favorite == true ? "star.fill" : "star").font(.system(size: 24, weight: .semibold)).frame(width: 44, height: 44) }.accessibilityLabel(song.favorite == true ? "取消喜爱" : "喜爱")
             Menu {
                 Button("导入歌词", systemImage: "text.badge.plus") { attachment = AttachmentImport(songID: song.id, kind: 0) }
                 Button("选择静态封面", systemImage: "photo") { attachment = AttachmentImport(songID: song.id, kind: 1) }
                 Button("选择视频封面", systemImage: "video") { attachment = AttachmentImport(songID: song.id, kind: 2) }
-                if let quality = song.quality { Section("音质") { Text(quality.description) } }
-            } label: { Image(systemName: "ellipsis").frame(width: 30, height: 40) }.disabled(library.importingAttachment).accessibilityLabel("歌曲选项")
+            } label: { Image(systemName: "ellipsis").font(.system(size: 24, weight: .bold)).frame(width: 44, height: 44) }.disabled(library.importingAttachment).accessibilityLabel("歌曲选项")
         }.buttonStyle(.plain)
     }
     @ViewBuilder private func lyricsContent(_ song: Song) -> some View {
         if song.lyrics != nil {
             LyricsView(song: song, position: library.position, playing: library.playing, showTranslation: translation, showPronunciation: pronunciation,
-                       onCapabilities: { hasTranslation = $0; hasPronunciation = $1 }, onError: { library.error = $0 })
+                       onSeek: { library.seek($0) }, onCapabilities: { hasTranslation = $0; hasPronunciation = $1 }, onError: { library.error = $0 })
                 .id(song.id).frame(maxHeight: .infinity)
             HStack {
                 Menu {
-                    Toggle("显示发音", isOn: $pronunciation).disabled(!hasPronunciation)
-                    Toggle("显示翻译", isOn: $translation).disabled(!hasTranslation)
+                    Toggle(isOn: $pronunciation) { Label("显示发音", systemImage: "text.bubble") }.disabled(!hasPronunciation)
+                    Toggle(isOn: $translation) { Label("显示翻译", systemImage: "character.bubble") }.disabled(!hasTranslation)
                 } label: { Image(systemName: "translate").frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }.buttonStyle(.plain).accessibilityLabel("歌词显示选项")
                 Spacer()
             }
         } else {
-            ContentUnavailableView { Label("让歌词跟随音乐", systemImage: "quote.bubble") } description: { Text("支持 LRC 与逐字 TTML 歌词") } actions: {
+            ContentUnavailableView { Label("让歌词跟随音乐", systemImage: "quote.bubble") } actions: {
                 Button("导入歌词") { attachment = AttachmentImport(songID: song.id, kind: 0) }.buttonStyle(ClearGlassButtonStyle())
             }.frame(maxHeight: .infinity)
         }
@@ -149,7 +155,7 @@ struct NowPlayingView: View {
             Slider(value: Binding(get: { scrubbing ? scrub : library.position }, set: { scrub = $0 }), in: 0...max(1, library.duration), onEditingChanged: { active in scrubbing = active; if !active { library.seek(scrub) } }).tint(.white.opacity(0.8)).accessibilityLabel("播放进度")
             HStack {
                 Text(clock(scrubbing ? scrub : library.position)); Spacer()
-                if let quality = library.current?.quality, quality.lossless { Label("无损", systemImage: "waveform").font(.caption2) }
+                if let quality = library.current?.quality, quality.lossless { Button { showQuality = true } label: { Label("无损", systemImage: "waveform").font(.caption.weight(.semibold)).padding(.horizontal, 12).padding(.vertical, 6) }.buttonStyle(.plain).foregroundStyle(.white).glassEffect(.clear, in: .capsule) }
                 Spacer(); Text("−" + clock(max(0, library.duration - library.position)))
             }.font(.caption.monospacedDigit()).foregroundStyle(.white.opacity(0.55))
         }

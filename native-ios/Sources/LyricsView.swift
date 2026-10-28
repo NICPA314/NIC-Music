@@ -10,6 +10,7 @@ struct LyricsView: UIViewRepresentable {
     var reduceMotion = false
     var showTranslation = true
     var showPronunciation = true
+    var onSeek: (Double) -> Void = { _ in }
     var onCapabilities: (Bool, Bool) -> Void = { _, _ in }
     var onError: (String) -> Void
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -18,6 +19,14 @@ struct LyricsView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "lyrics")
         let web = WKWebView(frame: .zero, configuration: config)
         web.isOpaque = false; web.backgroundColor = .clear; web.scrollView.backgroundColor = .clear
+        // The canvas must cover the entire SwiftUI-provided bounds, including
+        // safe areas. UIKit's automatic scroll inset otherwise exposes the
+        // static artwork behind the animated canvas at the top and bottom.
+        web.scrollView.contentInsetAdjustmentBehavior = .never
+        web.scrollView.contentInset = .zero
+        web.scrollView.scrollIndicatorInsets = .zero
+        web.scrollView.isScrollEnabled = false
+        web.scrollView.bounces = false
         context.coordinator.web = web
         context.coordinator.onError = onError
         web.navigationDelegate = context.coordinator
@@ -36,6 +45,7 @@ struct LyricsView: UIViewRepresentable {
         context.coordinator.showTranslation = showTranslation
         context.coordinator.showPronunciation = showPronunciation
         context.coordinator.onCapabilities = onCapabilities
+        context.coordinator.onSeek = onSeek
         context.coordinator.sync()
     }
     static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) {
@@ -54,11 +64,13 @@ struct LyricsView: UIViewRepresentable {
         var reduceMotion = false
         var showTranslation = true
         var showPronunciation = true
+        var onSeek: ((Double) -> Void)?
         var onCapabilities: ((Bool, Bool) -> Void)?
         var failed = false
         var onError: ((String)->Void)?
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let body = message.body as? [String:Any] else { return }
+            if body["event"] as? String == "seek", let time = body["time"] as? Double, time.isFinite, time >= 0 { onSeek?(time / 1000) }
             if body["event"] as? String == "ready" { ImportDiagnostics.record("AMLL page ready"); ready = true; sync() }
             if body["event"] as? String == "backgroundReady" {
                 ImportDiagnostics.record("AMLL background ready")

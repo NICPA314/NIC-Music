@@ -3,6 +3,7 @@ import SwiftUI
 struct MusicSearchView: View {
     @Environment(MusicLibrary.self) private var library
     @State private var query = ""
+    @FocusState private var searchFocused: Bool
     private var term: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var tracks: [Song] { library.librarySongs.filter { ($0.title + " " + $0.artist + " " + ($0.album ?? "")).localizedCaseInsensitiveContains(term) } }
     private var albums: [AlbumGroup] {
@@ -17,12 +18,19 @@ struct MusicSearchView: View {
         VStack(spacing: 0) {
             searchField
             searchContent
+                .overlay {
+                    if searchFocused {
+                        Color.clear.contentShape(Rectangle())
+                            .onTapGesture { searchFocused = false }
+                            .accessibilityLabel("收起键盘")
+                    }
+                }
         }
     }
     @ViewBuilder private var searchContent: some View {
         Group {
             if term.isEmpty { categories }
-            else if tracks.isEmpty && albums.isEmpty && artists.isEmpty { ContentUnavailableView.search(text: term) }
+            else if tracks.isEmpty && albums.isEmpty && artists.isEmpty { ContentUnavailableView("没有搜索结果", systemImage: "magnifyingglass", description: Text("试试其他歌曲、专辑或歌手名称。")) }
             else {
                 List {
                     if !tracks.isEmpty { Section("歌曲") { ForEach(tracks) { song in SearchTrackRow(song: song, queue: tracks) } } }
@@ -46,7 +54,7 @@ struct MusicSearchView: View {
     private var searchField: some View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("歌曲、专辑、歌手", text: $query).submitLabel(.search).accessibilityIdentifier("music-search-field")
+                TextField("歌曲、专辑、歌手", text: $query).focused($searchFocused).submitLabel(.search).onSubmit { searchFocused = false }.accessibilityIdentifier("music-search-field")
                 if !query.isEmpty { Button("清除", systemImage: "xmark.circle.fill") { query = "" }.labelStyle(.iconOnly).foregroundStyle(.secondary) }
             }.padding(16).glassEffect(.clear.interactive(), in: .capsule).padding(.horizontal, 20).padding(.bottom, 12)
     }
@@ -119,11 +127,11 @@ private struct SearchCategoryCard: View {
                 category.color
                 if let artwork, let image = UIImage(data: artwork) {
                     Image(uiImage: image).resizable().scaledToFill().frame(width: geometry.size.width * 0.72, height: 130)
-                        .clipped().rotationEffect(.degrees(12)).offset(x: geometry.size.width * 0.37, y: -8).blendMode(.luminosity).opacity(0.6)
+                        .clipped().rotationEffect(.degrees(12)).offset(x: geometry.size.width * 0.37, y: -8).saturation(1.15).opacity(0.9)
                 } else {
                     Image(systemName: category.icon).font(.system(size: 64, weight: .bold)).foregroundStyle(.white.opacity(0.2)).rotationEffect(.degrees(-12)).offset(x: geometry.size.width * 0.45, y: -22)
                 }
-                LinearGradient(colors: [.clear, .black.opacity(0.15)], startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: [.clear, category.color.opacity(0.15)], startPoint: .top, endPoint: .bottom)
                 Text(category.title).font(.system(size: 18, weight: .bold)).foregroundStyle(.white).lineLimit(2).padding(14)
             }.frame(width: geometry.size.width, height: geometry.size.height).clipped().clipShape(RoundedRectangle(cornerRadius: 16))
         }.frame(height: 112)

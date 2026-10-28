@@ -35,24 +35,24 @@ struct LibraryRoot: View {
                             ToolbarItem(placement: .topBarTrailing) { toolbarImportMenu }
                                 .sharedBackgroundVisibility(.hidden)
                         }
-                }.toolbar(.hidden, for: .tabBar)
-            }
-            Tab("搜索", systemImage: "magnifyingglass", value: 1) {
-                NavigationStack { MusicSearchView().navigationTitle("搜索") }.toolbar(.hidden, for: .tabBar)
+                }
             }
             Tab("播放列表", systemImage: "music.note.list", value: 3) {
-                NavigationStack { playlistList.navigationTitle("播放列表") }.toolbar(.hidden, for: .tabBar)
+                NavigationStack { playlistList.navigationTitle("播放列表") }
             }
             Tab("专辑", systemImage: "square.stack", value: 4) {
-                NavigationStack { albumGrid.navigationTitle("专辑") }.toolbar(.hidden, for: .tabBar)
+                NavigationStack { albumGrid.navigationTitle("专辑") }
             }
             Tab("歌手", systemImage: "person.crop.circle", value: 5) {
-                NavigationStack { ArtistDirectoryView().navigationTitle("歌手") }.toolbar(.hidden, for: .tabBar)
+                NavigationStack { ArtistDirectoryView().navigationTitle("歌手") }
+            }
+            Tab("搜索", systemImage: "magnifyingglass", value: 1, role: .search) {
+                NavigationStack { MusicSearchView().navigationTitle("搜索") }
             }
         }
-        .toolbar(.hidden, for: .tabBar)
-        .safeAreaInset(edge: .bottom) { bottomDock }
-        .fullScreenCover(item: $presented) { _ in NowPlayingView().environment(library) }
+
+        .tabViewBottomAccessory { bottomDock }
+        .sheet(item: $presented) { _ in NowPlayingView().environment(library).presentationDetents([.large]).presentationDragIndicator(.hidden) }
         .background {
             if let request = importRequest { DocumentImportPicker(types: request.folder ? [.folder] : [.audio], multiple: !request.folder) { urls in
                 library.pendingSelectionID = nil
@@ -70,7 +70,7 @@ struct LibraryRoot: View {
         Form {
             Section("音乐") { LabeledContent("歌曲", value: "\(library.librarySongs.count)") }
             Section("关于") {
-                LabeledContent("版本", value: ImportDiagnostics.version)
+                LabeledContent("版本", value: ImportDiagnostics.displayVersion)
                 Link("源码与许可证", destination: URL(string:"https://github.com/NICPA314/NIC-Music")!)
             }
         }.navigationTitle("设置")
@@ -87,31 +87,8 @@ struct LibraryRoot: View {
                     Button(library.playing ? "暂停" : "播放", systemImage: library.playing ? "pause.fill" : "play.fill") { library.toggle() }.labelStyle(.iconOnly).font(.title2).foregroundStyle(.primary).frame(width: 36, height: 44)
                 }.buttonStyle(.plain).padding(.horizontal, 10).frame(height: 56).glassEffect(.clear.interactive(), in: .capsule)
             }
-            HStack(spacing: 12) {
-                HStack(spacing: 0) {
-                    dockTab("资料库", icon: "square.stack.fill", value: 0, identifier: "library-tab")
-                    dockTab("播放列表", icon: "music.note.list", value: 3, identifier: "playlists-tab")
-                    dockTab("专辑", icon: "square.stack", value: 4, identifier: "albums-tab")
-                    dockTab("歌手", icon: "person.crop.circle.fill", value: 5, identifier: "artists-tab")
-                }.padding(5).frame(height: 68).glassEffect(.clear, in: .capsule)
-                    .shadow(color: .black.opacity(0.12), radius: 12, y: 5)
-                Button { selectedTab = 1 } label: { Image(systemName: "magnifyingglass").font(.system(size: 27, weight: .medium)).foregroundStyle(.primary).frame(width: 64, height: 64) }
-                    .buttonStyle(.plain).glassEffect(.clear.interactive(), in: .circle).accessibilityLabel("搜索").accessibilityIdentifier("search-tab")
             }
-            }
-        }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 6)
-    }
-    private func dockTab(_ title: String, icon: String, value: Int, identifier: String) -> some View {
-        Button { withAnimation(.snappy(duration: 0.2)) { selectedTab = value } } label: {
-            VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 25, weight: .medium))
-                Text(title).font(.system(size: 11, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
-            }
-                .foregroundStyle(selectedTab == value ? Color.pink : Color.primary)
-                .frame(maxWidth: .infinity).frame(height: 58)
-                .background { if selectedTab == value { Capsule().fill(Color.primary.opacity(0.09)) } }
-                .contentShape(Capsule())
-        }.buttonStyle(.plain).accessibilityLabel(title).accessibilityIdentifier(identifier)
+        }.padding(.horizontal, 12)
     }
     private var importMenu: some View {
         Menu {
@@ -124,7 +101,7 @@ struct LibraryRoot: View {
         Menu {
             Button("选择音乐文件", systemImage: "music.note") { startImport(folder: false) }
             Button("导入文件夹", systemImage: "folder") { startImport(folder: true) }
-        } label: { Image(systemName: "plus").font(.title2).frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }
+        } label: { Image(systemName: "plus").font(.title2).frame(width: 44, height: 44) }.glassEffect(.clear.interactive(), in: .circle)
             .buttonStyle(.plain).disabled(library.importing).accessibilityLabel("导入音乐").accessibilityIdentifier("import-music")
     }
     private func startImport(folder: Bool, playlistID: UUID? = nil) {
@@ -209,7 +186,7 @@ struct LibraryRoot: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Picker("排列方式", selection: $albumSort) { Text("名称").tag("name"); Text("时间").tag("date"); Text("歌手").tag("artist") }
-                } label: { Image(systemName: "arrow.up.arrow.down").frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }.buttonStyle(.plain).accessibilityLabel("专辑排列方式")
+                } label: { Image(systemName: "arrow.up.arrow.down").frame(width: 44, height: 44) }.glassEffect(.clear.interactive(), in: .circle).buttonStyle(.plain).accessibilityLabel("专辑排列方式")
             }.sharedBackgroundVisibility(.hidden)
         }
     }
@@ -223,7 +200,7 @@ struct LibraryRoot: View {
             if library.playlists.isEmpty { ContentUnavailableView("暂无播放列表", systemImage: "music.note.list") }
         }.toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button { newPlaylist = true } label: { Image(systemName: "plus").frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }.buttonStyle(.plain).accessibilityLabel("新建播放列表")
+                Button { newPlaylist = true } label: { Image(systemName: "plus").frame(width: 44, height: 44) }.glassEffect(.clear.interactive(), in: .circle).buttonStyle(.plain).accessibilityLabel("新建播放列表")
             }.sharedBackgroundVisibility(.hidden)
         }
     }

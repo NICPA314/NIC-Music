@@ -222,6 +222,18 @@ actor MusicFileImporter {
                 else { tags.discNumber = number }
             }
         }
+        // Prefer the container's exact fields over lossy common-key mappings.
+        for item in items {
+            guard let value = try? await item.load(.stringValue),
+                  !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            switch item.identifier {
+            case .iTunesMetadataSongName: tags.title = value
+            case .iTunesMetadataArtist: tags.artist = value
+            case .iTunesMetadataAlbum: tags.album = value
+            case .iTunesMetadataAlbumArtist: tags.albumArtist = value
+            default: break
+            }
+        }
         return tags
     }
 

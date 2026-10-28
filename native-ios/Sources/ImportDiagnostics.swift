@@ -4,6 +4,7 @@ import Foundation
 // or music metadata are recorded, and nothing is sent over the network.
 enum ImportDiagnostics {
     private static let lock = NSLock()
+    static var displayVersion: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?" }
     static var version: String {
         "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"))"
     }
