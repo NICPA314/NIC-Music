@@ -9,7 +9,6 @@ import UniformTypeIdentifiers
 struct LibraryRoot: View {
     @Environment(MusicLibrary.self) private var library
     @State private var showImporter = false
-    @State private var pendingImport: [URL] = []
     @State private var importFolder = false
     @State private var importPlaylistID: UUID?
     @State private var newPlaylist = false
@@ -57,10 +56,10 @@ struct LibraryRoot: View {
             }
         }
         .sheet(item: $presented) { _ in NowPlayingView().environment(library) }
-        .sheet(isPresented: $showImporter, onDismiss: finishImportSelection) {
+        .sheet(isPresented: $showImporter) {
             DocumentImportPicker(types: importFolder ? [.folder] : [.audio], multiple: !importFolder) { urls in
-                pendingImport = urls
                 showImporter = false
+                importSelection(urls, folder: importFolder, playlistID: importPlaylistID)
             }
         }
         .safeAreaInset(edge: .top) { if library.importing { HStack { ProgressView(); Text(library.importProgress).font(.footnote).lineLimit(2) }.padding(12).frame(maxWidth: .infinity).background(.regularMaterial).accessibilityIdentifier("import-progress") } }
@@ -75,12 +74,11 @@ struct LibraryRoot: View {
         } label: { Label("导入音乐", systemImage: "plus") }.disabled(library.importing).accessibilityIdentifier("import-music")
     }
     private func startImport(folder: Bool, playlistID: UUID? = nil) { importFolder = folder; importPlaylistID = playlistID; showImporter = true }
-    private func finishImportSelection() {
-        let urls = pendingImport
-        pendingImport = []
+    private func importSelection(_ urls: [URL], folder: Bool, playlistID: UUID?) {
+        ImportDiagnostics.record("selection received \(urls.count), folder=\(folder)")
+        // The document picker can dismiss itself before its delegate delivers URLs.
+        // Start from that delegate event, never from SwiftUI's sheet onDismiss.
         guard !urls.isEmpty else { return }
-        let folder = importFolder
-        let playlistID = importPlaylistID
         Task {
             if folder, let url = urls.first { await library.importDirectory(url, playlistID: playlistID) }
             else { await library.importSongs(urls, playlistID: playlistID) }
