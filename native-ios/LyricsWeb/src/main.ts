@@ -4,6 +4,8 @@ import { handleTTMLParsing } from './ttml-parser';
 import '@applemusic-like-lyrics/core/style.css';
 import './style.css';
 const player = new LyricPlayer();
+player.pause();
+if (matchMedia('(prefers-reduced-motion: reduce)').matches) { player.setEnableSpring(false); player.setEnableScale(false); }
 document.body.appendChild(player.getElement());
 let time = 0, playing = false, stamp = performance.now(), last = stamp;
 let original: LyricLine[] = [], translation = true, pronunciation = true;
@@ -20,6 +22,7 @@ const render = () => {
 };
 (window as any).setPlayback = (milliseconds: number, active: boolean) => {
   const seek = Math.abs(milliseconds - currentTime()) > 750;
+  if (playing !== active) { if (active) player.resume(); else player.pause(); }
   time = milliseconds; playing = active; stamp = performance.now();
   if (seek) player.setCurrentTime(time, true);
 };

@@ -82,7 +82,21 @@ export function handleTTMLParsing(
 	displayLang?: string,
 ): TTMLParserResult {
 	const parser = new TTMLParser();
-	const result = parser.parse(lyricStr);
+	// Standard TTML does not require Apple's per-line keys, but AMLL's parser does.
+	// Supply identifiers only where absent so valid unkeyed lines are not dropped.
+	const document = new DOMParser().parseFromString(lyricStr, "application/xml");
+	const namespace = "http://music.apple.com/lyric-ttml-internal";
+	const paragraphs = Array.from(document.getElementsByTagNameNS("*", "p"));
+	const usedKeys = new Set(paragraphs.map(line => line.getAttributeNS(namespace, "key")));
+	let generated = 0;
+	for (const line of paragraphs) {
+		if (!line.getAttributeNS(namespace, "key")) {
+			let key: string;
+			do { key = `nic-line-${++generated}`; } while (usedKeys.has(key));
+			line.setAttributeNS(namespace, "itunes:key", key); usedKeys.add(key);
+		}
+	}
+	const result = parser.parse(new XMLSerializer().serializeToString(document));
 
 	const availableTransLangs = new Set<string>();
 	for (const line of result.lines) {

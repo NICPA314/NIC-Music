@@ -38,7 +38,7 @@ struct LibraryRoot: View {
                 NavigationStack {
                     Form {
                         Section("音乐") { importMenu; LabeledContent("歌曲", value: "\(library.librarySongs.count)"); Text("导入文件夹可同时读取专辑封面和同名 TTML／LRC 歌词。").font(.footnote).foregroundStyle(.secondary) }
-                        Section("关于") { LabeledContent("NIC Music", value: "0.1.0"); Link("AMLL Player 开源项目", destination: URL(string:"https://github.com/amll-dev/amll-player")!); Link("源码与许可证", destination: URL(string:"https://github.com/NICPA314/AMLL-Player-iOS")!) }
+                        Section("关于") { LabeledContent("NIC Music", value: "0.2.0"); Link("AMLL Player 开源项目", destination: URL(string:"https://github.com/amll-dev/amll-player")!); Link("源码与许可证", destination: URL(string:"https://github.com/NICPA314/AMLL-Player-iOS")!) }
                     }.navigationTitle("设置")
                 }
             }
@@ -49,7 +49,7 @@ struct LibraryRoot: View {
                     Button { presented = song } label: {
                         HStack(spacing: 10) { Cover(song: song).frame(width: 40, height: 40); Text(song.title).font(.subheadline.weight(.medium)).lineLimit(1).foregroundStyle(.primary) }
                             .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(.plain).accessibilityIdentifier("mini-player")
                     Button(library.playing ? "暂停" : "播放", systemImage: library.playing ? "pause.fill" : "play.fill") { library.toggle() }.labelStyle(.iconOnly).foregroundStyle(.primary)
                     Button("下一首", systemImage: "forward.fill") { library.next(1) }.labelStyle(.iconOnly).foregroundStyle(.primary)
                 }.padding(.horizontal, 16).padding(.vertical, 8)
@@ -82,6 +82,13 @@ struct LibraryRoot: View {
     private var albums: [AlbumGroup] {
         Dictionary(grouping: library.librarySongs, by: \.albumKey).map { AlbumGroup(id: $0.key, songs: $0.value) }.sorted { $0.first.albumTitle < $1.first.albumTitle }
     }
+    private var recentAlbums: [AlbumGroup] {
+        var seen = Set<String>()
+        return library.librarySongs.reversed().compactMap { song in
+            guard seen.insert(song.albumKey).inserted else { return nil }
+            return albums.first { $0.id == song.albumKey }
+        }
+    }
     @ViewBuilder private var libraryContent: some View {
         if library.librarySongs.isEmpty { songList([]) }
         else {
@@ -102,8 +109,8 @@ struct LibraryRoot: View {
                     }
                     Text("最近添加").font(.title2.bold())
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 22) {
-                        ForEach(library.librarySongs.reversed()) { song in
-                            Button { library.play(song); presented = song } label: { tile(song, title: song.title, subtitle: song.artist) }.buttonStyle(.plain)
+                        ForEach(recentAlbums) { album in
+                            NavigationLink { AlbumDetailView(albumKey: album.id) } label: { tile(album.first, title: album.first.albumTitle, subtitle: album.first.albumArtist ?? album.first.artist) }.buttonStyle(.plain)
                         }
                     }
                 }.padding(20)
@@ -160,7 +167,7 @@ struct LibraryRoot: View {
             List {
                 Section {
                     ForEach(songs) { song in
-                        Button { library.play(song) } label: {
+                        Button { library.play(song, queue: songs) } label: {
                             HStack(spacing: 14) {
                                 Cover(song: song).frame(width: 54, height: 54)
                                 VStack(alignment: .leading, spacing: 5) { Text(song.title).font(.body.weight(.medium)).lineLimit(1).foregroundStyle(.primary); Text(song.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1) }

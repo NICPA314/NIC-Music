@@ -33,6 +33,7 @@ import AVFoundation
         XCTAssertEqual(song.quality?.codec, "ALAC")
         XCTAssertEqual(song.trackNumber, 1)
         XCTAssertEqual(song.releaseDate, "2024-01-02")
+        XCTAssertEqual(song.recordLabel, "Fixture Records")
         try FileManager.default.removeItem(at: source)
         library.play(song)
         XCTAssertTrue(library.playing, library.error ?? "")

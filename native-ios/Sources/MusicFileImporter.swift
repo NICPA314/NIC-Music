@@ -7,6 +7,14 @@ import CryptoKit
 actor MusicFileImporter {
     static let shared = MusicFileImporter()
 
+    func storeArtwork(_ data: Data, beside audio: String, in folder: URL) throws -> String {
+        let ext = data.starts(with: [0x89, 0x50, 0x4E, 0x47]) ? "png" : "jpg"
+        let stem = (audio as NSString).deletingPathExtension
+        let name = stem + ".cover-" + UUID().uuidString.prefix(8) + "." + ext
+        try data.write(to: folder.appendingPathComponent(name), options: .atomic)
+        return name
+    }
+
     func place(_ stagedFilename: String, in folder: URL, location: [String], originalName: String) throws -> String {
         func safe(_ component: String) -> String {
             let invalid = CharacterSet(charactersIn: "/\\:?*<>|\"").union(.controlCharacters)
@@ -47,6 +55,7 @@ actor MusicFileImporter {
 
     func importAudio(_ source: URL, into folder: URL, companions: Bool = false) async throws -> Song {
         let destination = try copy(source, into: folder.appendingPathComponent("Audio", isDirectory: true))
+        var videoCopy: URL?
         do {
             let audio = try AVAudioPlayer(contentsOf: destination)
             guard audio.duration > 0, audio.prepareToPlay() else { throw CocoaError(.fileReadCorruptFile) }
@@ -69,6 +78,15 @@ actor MusicFileImporter {
                     if let sidecar = siblings.first(where: { $0.deletingPathExtension().lastPathComponent == source.deletingPathExtension().lastPathComponent && $0.pathExtension.lowercased() == ext }),
                        let text = try? readLyrics(sidecar) { lyrics = text; lyricKind = ext; break }
                 }
+                for name in ["portrait_animated_artwork.mp4", "square_animated_artwork.mp4", "cover.mp4"] {
+                    if let video = siblings.first(where: { $0.lastPathComponent.lowercased() == name }) {
+                        if let (file, poster) = try? await importCover(video, video: true, into: folder) {
+                            videoCopy = file
+                            if artwork == nil { artwork = poster }
+                        }
+                        break
+                    }
+                }
             }
             let handle = try FileHandle(forReadingFrom: destination)
             defer { try? handle.close() }
@@ -84,12 +102,13 @@ actor MusicFileImporter {
             }
             return Song(id: UUID(), title: title, artist: tags.artist ?? "未知艺人",
                         filename: "Audio/" + destination.lastPathComponent, artwork: artwork, lyrics: lyrics,
-                        lyricKind: lyricKind, album: tags.album, albumArtist: tags.albumArtist,
+                        lyricKind: lyricKind, videoFilename: videoCopy?.lastPathComponent, album: tags.album, albumArtist: tags.albumArtist,
                         releaseDate: tags.releaseDate, copyright: tags.copyright, recordLabel: tags.recordLabel,
                         genre: tags.genre, composer: tags.composer, trackNumber: tags.trackNumber,
                         discNumber: tags.discNumber, quality: AudioQuality.read(destination), contentHash: fingerprint, sourceNumber: number)
         } catch {
             try? FileManager.default.removeItem(at: destination)
+            if let videoCopy { try? FileManager.default.removeItem(at: videoCopy) }
             throw error
         }
     }

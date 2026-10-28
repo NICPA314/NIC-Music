@@ -16,8 +16,10 @@ struct LyricsView: UIViewRepresentable {
         let web = WKWebView(frame: .zero, configuration: config)
         web.isOpaque = false; web.backgroundColor = .clear; web.scrollView.backgroundColor = .clear
         context.coordinator.web = web
+        context.coordinator.onError = onError
         web.navigationDelegate = context.coordinator
         if let url = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "dist") { web.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent()) }
+        else { DispatchQueue.main.async { onError("离线歌词资源缺失，请重新安装完整测试包。") } }
         return web
     }
     func updateUIView(_ web: WKWebView, context: Context) {

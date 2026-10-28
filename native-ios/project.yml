@@ -46,11 +46,21 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+  NICMusicUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: NICMusic
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   NICMusic:
     build:
       targets:
         NICMusic: all
         NICMusicTests: [test]
+        NICMusicUITests: [test]
     test:
-      targets: [NICMusicTests]
+      targets: [NICMusicTests, NICMusicUITests]

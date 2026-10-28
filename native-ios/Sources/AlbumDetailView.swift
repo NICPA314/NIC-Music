@@ -20,10 +20,10 @@ struct AlbumDetailView: View {
                         NavigationLink(first.albumArtist ?? first.artist) { ArtistDetailView(artist: first.albumArtist ?? first.artist) }.font(.title3)
                         Text([first.genre, first.releaseDate].compactMap { $0 }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
                     }
-                    Button("播放", systemImage: "play.fill") { library.play(first) }.buttonStyle(.glassProminent)
+                    Button("播放", systemImage: "play.fill") { library.play(first, queue: songs) }.buttonStyle(.glassProminent)
                     VStack(spacing: 0) {
                         ForEach(songs) { song in
-                            Button { library.play(song) } label: {
+                            Button { library.play(song, queue: songs) } label: {
                                 HStack {
                                     Text(song.trackNumber.map(String.init) ?? "–").foregroundStyle(.secondary).frame(width: 28)
                                     Text(song.title).foregroundStyle(.primary).lineLimit(1)

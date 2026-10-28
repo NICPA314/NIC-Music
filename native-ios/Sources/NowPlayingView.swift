@@ -40,7 +40,7 @@ struct NowPlayingView: View {
                             ScrollView {
                                 LazyVStack(alignment: .leading, spacing: 16) {
                                     Text("继续播放").font(.title2.bold())
-                                    ForEach(library.songs) { item in
+                                    ForEach(library.queue) { item in
                                         Button { library.play(item) } label: {
                                             HStack(spacing: 12) { Cover(song: item).frame(width: 44, height: 44); VStack(alignment: .leading) { Text(item.title); Text(item.artist).font(.subheadline).opacity(0.6) }; Spacer(); if item.id == song.id { Image(systemName: "waveform") } }
                                         }.buttonStyle(.plain)

@@ -28,6 +28,7 @@ struct Song: Identifiable, Codable, Equatable {
     var libraryAlbumKey: String?
     var sourceNumber: Int?
     var storagePlaylistID: UUID?
+    var artworkFilename: String?
     var albumTitle: String { libraryAlbumTitle ?? album ?? "未知专辑" }
     var metadataAlbumKey: String { Self.normalized(album ?? "未知专辑") + "\u{1F}" + Self.normalized(albumArtist ?? artist) }
     var albumKey: String { libraryAlbumKey ?? metadataAlbumKey }
@@ -48,6 +49,8 @@ struct Song: Identifiable, Codable, Equatable {
     var playlists: [Playlist] = []
     var artistArtwork: [String: Data] = [:]
     var currentID: UUID?
+    private var queueIDs: [UUID] = []
+    var queue: [Song] { queueIDs.compactMap { id in songs.first { $0.id == id } } }
     var playing = false
     var position: Double = 0
     var duration: Double = 0
@@ -71,6 +74,9 @@ struct Song: Identifiable, Codable, Equatable {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             let index = folder.appendingPathComponent("library.json")
             if FileManager.default.fileExists(atPath: index.path) { songs = try JSONDecoder().decode([Song].self, from: Data(contentsOf: index)) }
+            for i in songs.indices {
+                if let file = songs[i].artworkFilename { songs[i].artwork = try? Data(contentsOf: folder.appendingPathComponent(file)) }
+            }
             let lists = folder.appendingPathComponent("playlists.json")
             if FileManager.default.fileExists(atPath: lists.path) { playlists = try JSONDecoder().decode([Playlist].self, from: Data(contentsOf: lists)) }
             let artists = folder.appendingPathComponent("artists.json")
@@ -91,7 +97,9 @@ struct Song: Identifiable, Codable, Equatable {
         catch { self.error = "保存失败：\(error.localizedDescription)" }
     }
     private func persist(_ value: [Song]) throws {
-        try JSONEncoder().encode(value).write(to: folder.appendingPathComponent("library.json"), options: .atomic)
+        // Keep large cover blobs out of the index, which is atomically updated per song.
+        let index = value.map { song in var entry = song; if entry.artworkFilename != nil { entry.artwork = nil }; return entry }
+        try JSONEncoder().encode(index).write(to: folder.appendingPathComponent("library.json"), options: .atomic)
     }
     func importDirectory(_ directory: URL, playlistID: UUID? = nil) async {
         guard !importing else { return }
@@ -124,6 +132,7 @@ struct Song: Identifiable, Codable, Equatable {
                 if let hash = song.contentHash, let existing = songs.first(where: { $0.contentHash == hash && $0.storagePlaylistID == playlistID }) {
                     importedIDs.append(existing.id); skipped += 1
                     try? FileManager.default.removeItem(at: folder.appendingPathComponent(song.filename))
+                    if let video = song.videoFilename { try? FileManager.default.removeItem(at: folder.appendingPathComponent(video)) }
                     continue
                 }
                 let directory = url.deletingLastPathComponent()
@@ -149,6 +158,14 @@ struct Song: Identifiable, Codable, Equatable {
                 } else { location = ["Albums", song.albumArtist ?? song.artist, song.albumTitle] }
                 song.filename = try await MusicFileImporter.shared.place(song.filename, in: folder, location: location, originalName: url.lastPathComponent)
                 copied = song
+                if let video = song.videoFilename {
+                    song.videoFilename = try await MusicFileImporter.shared.place(video, in: folder, location: location, originalName: url.deletingPathExtension().lastPathComponent + ".cover.mp4")
+                    copied = song
+                }
+                if let artwork = song.artwork {
+                    song.artworkFilename = try await MusicFileImporter.shared.storeArtwork(artwork, beside: song.filename, in: folder)
+                    copied = song
+                }
                 importProgress = "正在保存 \(index + 1)/\(urls.count)：\(url.lastPathComponent)"
                 let updated = songs + [song]
                 try persist(updated)
@@ -157,6 +174,8 @@ struct Song: Identifiable, Codable, Equatable {
                 importedIDs.append(song.id)
             } catch {
                 if let copied { try? FileManager.default.removeItem(at: folder.appendingPathComponent(copied.filename)) }
+                if let video = copied?.videoFilename { try? FileManager.default.removeItem(at: folder.appendingPathComponent(video)) }
+                if let artwork = copied?.artworkFilename { try? FileManager.default.removeItem(at: folder.appendingPathComponent(artwork)) }
                 failures.append("\(url.lastPathComponent)：\(error.localizedDescription)")
             }
         }
@@ -189,8 +208,13 @@ struct Song: Identifiable, Codable, Equatable {
             artistArtwork = updated
         } catch { self.error = "艺人封面保存失败：\(error.localizedDescription)" }
     }
-    func play(_ song: Song) {
+    func play(_ song: Song, queue: [Song]? = nil) {
         do {
+            if let queue { queueIDs = queue.map(\.id) }
+            else if !queueIDs.contains(song.id) {
+                if let id = song.storagePlaylistID, let playlist = playlists.first(where: { $0.id == id }) { queueIDs = playlist.songIDs }
+                else { queueIDs = librarySongs.map(\.id) }
+            }
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default)
             try session.setActive(true)
@@ -204,7 +228,7 @@ struct Song: Identifiable, Codable, Equatable {
     func pause() { player?.pause(); playing = false; nowPlaying() }
     func toggle() { playing ? pause() : resume() }
     func seek(_ seconds: Double) { player?.currentTime = min(max(seconds,0),duration); position = player?.currentTime ?? 0; nowPlaying() }
-    func next(_ step: Int) { guard let i = songs.firstIndex(where: { $0.id == currentID }), !songs.isEmpty else { return }; play(songs[(i+step+songs.count)%songs.count]) }
+    func next(_ step: Int) { let ordered = queue; guard let i = ordered.firstIndex(where: { $0.id == currentID }), !ordered.isEmpty else { return }; play(ordered[(i+step+ordered.count)%ordered.count]) }
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) { Task { @MainActor in if flag { self.next(1) } else { self.pause() } } }
     func addLyrics(_ url: URL, to id: UUID) async {
         guard !importingAttachment else { return }
@@ -223,20 +247,26 @@ struct Song: Identifiable, Codable, Equatable {
         importingAttachment = true
         defer { importingAttachment = false }
         var importedURL: URL?
+        var importedArtwork: String?
         do {
             let (file, thumbnail) = try await MusicFileImporter.shared.importCover(url, video: video, into: folder)
             importedURL = file
             guard let i = songs.firstIndex(where: { $0.id == id }) else { throw CocoaError(.fileNoSuchFile) }
             let previous = songs[i].videoFilename
+            let previousArtwork = songs[i].artworkFilename
+            let artwork = try await MusicFileImporter.shared.storeArtwork(thumbnail, beside: songs[i].filename, in: folder)
             var updated = songs
             updated[i].artwork = thumbnail; updated[i].customArtwork = true
+            importedArtwork = artwork; updated[i].artworkFilename = artwork
             updated[i].videoFilename = video ? file.lastPathComponent : nil
             try persist(updated); songs = updated
             if !video { try? FileManager.default.removeItem(at: file) }
             if let previous { try? FileManager.default.removeItem(at: folder.appendingPathComponent(previous)) }
+            if let previousArtwork { try? FileManager.default.removeItem(at: folder.appendingPathComponent(previousArtwork)) }
             nowPlaying()
         } catch {
             if let importedURL { try? FileManager.default.removeItem(at: importedURL) }
+            if let importedArtwork { try? FileManager.default.removeItem(at: folder.appendingPathComponent(importedArtwork)) }
             self.error = "封面导入失败：\(error.localizedDescription)"
         }
     }
