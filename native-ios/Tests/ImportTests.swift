@@ -122,7 +122,7 @@ import AVFoundation
         var b = a; b.title = "First alphabetically"; b.trackNumber = 2
         var c = a; c.artist = "B"; c.releaseDate = "2000"
         var d = a; d.album = "Older"; d.releaseDate = "2010"
-        XCTAssertEqual([c, b, a, d].sorted(by: Song.playlistOrder).map(\.title), [d.title, a.title, b.title, c.title])
+        XCTAssertEqual([c, b, a, d].sorted(by: Song.playlistOrder), [d, a, b, c])
     }
     func testIndexWriteFailureRollsBackCopiedAudio() async throws {
         try FileManager.default.createDirectory(at: library.folder.appendingPathComponent("library.json"), withIntermediateDirectories: false)

@@ -2,6 +2,7 @@ import XCTest
 
 final class DocumentPickerTests: XCTestCase {
     @MainActor func testSelectFileImportAndPlay() throws {
+        continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
@@ -15,17 +16,18 @@ final class DocumentPickerTests: XCTestCase {
         app.buttons["选择音乐文件"].tap()
         let browse = app.buttons["Browse"].firstMatch
         if browse.waitForExistence(timeout: 5) { browse.tap() }
-        let local = app.staticTexts["On My iPhone"].firstMatch
+        print("PICKER AFTER BROWSE:\n" + app.debugDescription)
+        let local = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "On My iPhone")).firstMatch
         if !local.waitForExistence(timeout: 5) {
             let back = app.navigationBars.buttons["Browse"].firstMatch
             if back.exists { back.tap() }
         }
         XCTAssertTrue(local.waitForExistence(timeout: 10)); local.tap()
-        let appFolder = app.staticTexts["NIC Music"].firstMatch
+        let appFolder = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "NIC Music")).firstMatch
         XCTAssertTrue(appFolder.waitForExistence(timeout: 10)); appFolder.tap()
-        let samples = app.staticTexts["Import Samples"].firstMatch
+        let samples = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Import Samples")).firstMatch
         XCTAssertTrue(samples.waitForExistence(timeout: 10)); samples.tap()
-        let file = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Wrong Filename")).firstMatch
+        let file = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Wrong Filename")).firstMatch
         XCTAssertTrue(file.waitForExistence(timeout: 10)); file.tap()
         for title in ["Open", "Done", "Import"] {
             let finish = app.buttons[title].firstMatch

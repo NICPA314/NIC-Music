@@ -136,10 +136,10 @@ actor MusicFileImporter {
             if tags.album == nil, item.commonKey == .commonKeyAlbumName { tags.album = value }
             if tags.albumArtist == nil, item.identifier == .iTunesMetadataAlbumArtist { tags.albumArtist = value }
             if tags.copyright == nil, item.commonKey == .commonKeyCopyrights || identifier.hasSuffix("cprt") { tags.copyright = value }
-            if tags.releaseDate == nil, identifier.hasSuffix("©day") || key == "date" || key == "releasetime" { tags.releaseDate = value }
+            if tags.releaseDate == nil, item.identifier == .iTunesMetadataReleaseDate || identifier.hasSuffix("©day") || key == "date" || key == "releasetime" { tags.releaseDate = value }
             if tags.recordLabel == nil, key == "label" || key == "publisher" || identifier.hasSuffix("label") || identifier.hasSuffix("publisher") { tags.recordLabel = value }
-            if tags.genre == nil, identifier.hasSuffix("©gen") || key == "genre" { tags.genre = value }
-            if tags.composer == nil, identifier.hasSuffix("©wrt") || key == "composer" { tags.composer = value }
+            if tags.genre == nil, item.identifier == .iTunesMetadataUserGenre || identifier.hasSuffix("©gen") || key == "genre" { tags.genre = value }
+            if tags.composer == nil, item.identifier == .iTunesMetadataComposer || identifier.hasSuffix("©wrt") || key == "composer" { tags.composer = value }
             if identifier.hasSuffix("trkn") || identifier.hasSuffix("disk"), let data = try? await item.load(.dataValue), data.count >= 4 {
                 let number = Int(data[2]) * 256 + Int(data[3])
                 if identifier.hasSuffix("trkn") { tags.trackNumber = number }
