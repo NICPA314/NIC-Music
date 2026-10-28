@@ -5,11 +5,27 @@ options:
 settings:
   base:
     SWIFT_VERSION: '5.0'
-    MARKETING_VERSION: '0.2.1'
-    CURRENT_PROJECT_VERSION: '5'
+    MARKETING_VERSION: '0.2.2'
+    CURRENT_PROJECT_VERSION: '6'
+    NIC_DIAGNOSTIC_LOGGING: NO
     CODE_SIGNING_ALLOWED: NO
     TARGETED_DEVICE_FAMILY: '1,2'
 targets:
+  NICImportFixtures:
+    type: application
+    platform: iOS
+    sources: [TestSupport/FixtureProvider]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.nicpa.importfixtures
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: NIC Import Fixtures
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    info:
+      path: build/FixtureProvider-Info.plist
+      properties:
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
   NICMusic:
     type: application
     platform: iOS
@@ -32,6 +48,7 @@ targets:
         UIBackgroundModes: [audio]
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        NICDiagnosticLoggingEnabled: $(NIC_DIAGNOSTIC_LOGGING)
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
   NICMusicTests:
     type: bundle.unit-test
@@ -57,6 +74,10 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
 schemes:
+  NICImportFixtures:
+    build:
+      targets:
+        NICImportFixtures: all
   NICMusic:
     build:
       targets:

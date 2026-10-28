@@ -18,7 +18,6 @@ struct LibraryRoot: View {
     @State private var playlistName = ""
     @State private var presented: Song?
     @State private var selectedTab = 0
-    @State private var diagnosticsCopied = false
     @AppStorage("albumSort") private var albumSort = "name"
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -52,13 +51,13 @@ struct LibraryRoot: View {
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom) { bottomDock }
         .fullScreenCover(item: $presented) { _ in NowPlayingView().environment(library) }
-        .sheet(item: $importRequest, onDismiss: selectionDismissed) { request in
-            DocumentImportPicker(types: request.folder ? [.folder] : [.audio], multiple: !request.folder) { urls in
+        .background {
+            if let request = importRequest { DocumentImportPicker(types: request.folder ? [.folder] : [.audio], multiple: !request.folder) { urls in
                 library.pendingSelectionID = nil
                 library.importStatus = urls.isEmpty ? "已取消导入" : "已收到 \(urls.count) 个选择结果"
                 importRequest = nil
                 importSelection(urls, folder: request.folder, playlistID: request.playlistID)
-            }
+            }.id(request.id).frame(width: 0, height: 0) }
         }
         .safeAreaInset(edge: .top) { if library.importing { HStack { ProgressView(); Text(library.importProgress).font(.footnote).lineLimit(2) }.padding(12).frame(maxWidth: .infinity).background(Color(uiColor: .systemBackground)).accessibilityIdentifier("import-progress") } }
         .alert("导入结果", isPresented: Binding(get: { library.importSummary != nil }, set: { if !$0 { library.importSummary = nil } })) { Button("好") { library.importSummary = nil } } message: { Text(library.importSummary ?? "") }
@@ -68,14 +67,10 @@ struct LibraryRoot: View {
     private var settingsContent: some View {
         Form {
             Section("音乐") { LabeledContent("歌曲", value: "\(library.librarySongs.count)") }
-            Section("导入") {
-                Text(library.importStatus).font(.subheadline)
-                Button(diagnosticsCopied ? "已复制诊断" : "复制导入诊断", systemImage: "doc.on.doc") {
-                    UIPasteboard.general.string = ImportDiagnostics.report(); diagnosticsCopied = true
-                }
+            Section("关于") {
+                LabeledContent("版本", value: ImportDiagnostics.version)
+                Link("源码与许可证", destination: URL(string:"https://github.com/NICPA314/NIC-Music")!)
             }
-            Section { LabeledContent("版本", value: ImportDiagnostics.version) }
-            Section("关于") { Link("源码与许可证", destination: URL(string:"https://github.com/NICPA314/NIC-Music")!) }
         }.navigationTitle("设置")
     }
     private var bottomDock: some View {
@@ -92,21 +87,28 @@ struct LibraryRoot: View {
             }
             HStack(spacing: 12) {
                 HStack(spacing: 0) {
-                    dockTab("资料库", icon: "music.note.house.fill", value: 0, identifier: "library-tab")
+                    dockTab("资料库", icon: "square.stack.fill", value: 0, identifier: "library-tab")
                     dockTab("播放列表", icon: "music.note.list", value: 3, identifier: "playlists-tab")
                     dockTab("专辑", icon: "square.stack", value: 4, identifier: "albums-tab")
-                    dockTab("歌手", icon: "person.crop.circle", value: 5, identifier: "artists-tab")
-                }.padding(.horizontal, 5).frame(height: 60).glassEffect(.clear.interactive(), in: .capsule)
-                Button { selectedTab = 1 } label: { Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.primary).frame(width: 56, height: 56) }
+                    dockTab("歌手", icon: "person.crop.circle.fill", value: 5, identifier: "artists-tab")
+                }.padding(5).frame(height: 68).glassEffect(.clear, in: .capsule)
+                    .shadow(color: .black.opacity(0.12), radius: 12, y: 5)
+                Button { selectedTab = 1 } label: { Image(systemName: "magnifyingglass").font(.system(size: 27, weight: .medium)).foregroundStyle(.primary).frame(width: 64, height: 64) }
                     .buttonStyle(.plain).glassEffect(.clear.interactive(), in: .circle).accessibilityLabel("搜索").accessibilityIdentifier("search-tab")
             }
             }
-        }.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 6)
+        }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 6)
     }
     private func dockTab(_ title: String, icon: String, value: Int, identifier: String) -> some View {
-        Button { selectedTab = value } label: {
-            VStack(spacing: 4) { Image(systemName: icon).font(.system(size: 20)); Text(title).font(.system(size: 10, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8) }
-                .foregroundStyle(selectedTab == value ? Color.pink : Color.primary).frame(maxWidth: .infinity).frame(height: 56).contentShape(Rectangle())
+        Button { withAnimation(.snappy(duration: 0.2)) { selectedTab = value } } label: {
+            VStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 25, weight: .medium))
+                Text(title).font(.system(size: 11, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
+            }
+                .foregroundStyle(selectedTab == value ? Color.pink : Color.primary)
+                .frame(maxWidth: .infinity).frame(height: 58)
+                .background { if selectedTab == value { Capsule().fill(Color.primary.opacity(0.09)) } }
+                .contentShape(Capsule())
         }.buttonStyle(.plain).accessibilityLabel(title).accessibilityIdentifier(identifier)
     }
     private var importMenu: some View {
@@ -125,22 +127,11 @@ struct LibraryRoot: View {
     }
     private func startImport(folder: Bool, playlistID: UUID? = nil) {
         let request = ImportRequest(folder: folder, playlistID: playlistID)
-        library.error = nil; diagnosticsCopied = false
+        library.error = nil
         library.pendingSelectionID = request.id
         library.importStatus = folder ? "等待选择文件夹" : "等待选择音乐文件"
         ImportDiagnostics.record("open picker, folder=\(folder), playlist=\(playlistID != nil), version=\(ImportDiagnostics.version)")
         importRequest = request
-    }
-    private func selectionDismissed() {
-        guard let requestID = library.pendingSelectionID else { return }
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2))
-            guard library.pendingSelectionID == requestID else { return }
-            library.pendingSelectionID = nil
-            library.importStatus = "选择窗口已关闭，但没有收到文件。"
-            ImportDiagnostics.record("picker dismissed without selection callback")
-            library.error = "没有收到选中的文件。请重试；如果再次发生，可在设置中复制导入诊断。"
-        }
     }
     private func importSelection(_ urls: [URL], folder: Bool, playlistID: UUID?) {
         ImportDiagnostics.record("selection received \(urls.count), folder=\(folder)")
@@ -201,9 +192,7 @@ struct LibraryRoot: View {
     private var albumGrid: some View {
         Group {
             if albums.isEmpty {
-                ContentUnavailableView { Label("暂无专辑", systemImage: "square.stack") } actions: {
-                    Button("导入文件夹", systemImage: "folder.badge.plus") { startImport(folder: true) }.buttonStyle(ClearGlassButtonStyle())
-                }
+                ContentUnavailableView("暂无专辑", systemImage: "square.stack")
             } else { ScrollView {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 22) {
                 ForEach(albums) { album in
@@ -219,10 +208,6 @@ struct LibraryRoot: View {
                 Menu {
                     Picker("排列方式", selection: $albumSort) { Text("名称").tag("name"); Text("时间").tag("date"); Text("歌手").tag("artist") }
                 } label: { Image(systemName: "arrow.up.arrow.down").frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }.buttonStyle(.plain).accessibilityLabel("专辑排列方式")
-            }.sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { startImport(folder: true) } label: { Image(systemName: "plus").font(.title2).frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }
-                    .buttonStyle(.plain).disabled(library.importing).accessibilityLabel("导入专辑文件夹")
             }.sharedBackgroundVisibility(.hidden)
         }
     }

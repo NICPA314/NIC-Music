@@ -1,6 +1,26 @@
 import XCTest
 
 final class DocumentPickerTests: XCTestCase {
+    @MainActor func testCancelThenReopenPicker() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        for choice in ["导入文件夹", "选择音乐文件"] {
+            let addButton = app.buttons["import-music"].firstMatch
+            XCTAssertTrue(addButton.waitForExistence(timeout: 15)); addButton.tap()
+            app.buttons[choice].tap()
+            let cancel = app.buttons["Cancel"].firstMatch
+            XCTAssertTrue(cancel.waitForExistence(timeout: 60)); cancel.tap()
+            XCTAssertTrue(addButton.waitForExistence(timeout: 15))
+            XCTAssertFalse(app.alerts["无法完成操作"].exists)
+            XCTAssertFalse(app.alerts["导入结果"].exists)
+        }
+        app.buttons["albums-tab"].tap()
+        XCTAssertFalse(app.buttons["导入文件夹"].exists)
+        XCTAssertFalse(app.buttons["导入专辑文件夹"].exists)
+    }
+
     @MainActor func testSelectFolderImportsAllSongs() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -15,12 +35,12 @@ final class DocumentPickerTests: XCTestCase {
         // The provider can remember the folder selected by the preceding test.
         for _ in 0..<4 {
             if local.waitForExistence(timeout: 2) { break }
-            let back = app.navigationBars.buttons.matching(NSPredicate(format: "label IN %@", ["Browse", "On My iPhone", "NIC Music"])).firstMatch
+            let back = app.navigationBars.buttons.matching(NSPredicate(format: "label IN %@", ["Browse", "On My iPhone", "NIC Import Fixtures"])).firstMatch
             guard back.exists else { break }
             back.tap()
         }
         XCTAssertTrue(local.waitForExistence(timeout: 10)); local.tap()
-        let appFolder = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "NIC Music")).firstMatch
+        let appFolder = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "NIC Import Fixtures")).firstMatch
         XCTAssertTrue(appFolder.waitForExistence(timeout: 10)); appFolder.tap()
         let samples = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Import Samples")).firstMatch
         XCTAssertTrue(samples.waitForExistence(timeout: 10)); samples.tap()
@@ -59,9 +79,11 @@ final class DocumentPickerTests: XCTestCase {
         XCTAssertTrue(settings.waitForExistence(timeout: 10)); settings.tap()
         XCTAssertFalse(app.staticTexts["AMLL Player 开源项目"].exists)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "导入文件夹可")).firstMatch.exists)
-        XCTAssertTrue(app.buttons["复制导入诊断"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["复制导入诊断"].exists)
+        XCTAssertFalse(app.staticTexts["导入"].exists)
+        XCTAssertTrue(app.staticTexts["0.2.2 (6)"].exists)
         let settingsImage = XCTAttachment(screenshot: app.screenshot())
-        settingsImage.name = "settings-version-and-diagnostics"; settingsImage.lifetime = .keepAlways; add(settingsImage)
+        settingsImage.name = "settings-about-version"; settingsImage.lifetime = .keepAlways; add(settingsImage)
     }
 
     @MainActor func testSelectFileImportAndPlay() throws {
@@ -88,7 +110,7 @@ final class DocumentPickerTests: XCTestCase {
             if back.exists { back.tap() }
         }
         XCTAssertTrue(local.waitForExistence(timeout: 10)); local.tap()
-        let appFolder = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "NIC Music")).firstMatch
+        let appFolder = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "NIC Import Fixtures")).firstMatch
         XCTAssertTrue(appFolder.waitForExistence(timeout: 10)); appFolder.tap()
         let samples = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Import Samples")).firstMatch
         XCTAssertTrue(samples.waitForExistence(timeout: 10)); samples.tap()

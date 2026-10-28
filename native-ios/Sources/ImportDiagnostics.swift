@@ -8,7 +8,8 @@ enum ImportDiagnostics {
         "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"))"
     }
     private static var fileURL: URL? {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("ImportDiagnostics.log")
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("Logs", isDirectory: true).appendingPathComponent("NIC-Music.log")
     }
     static func report() -> String {
         lock.lock(); defer { lock.unlock() }
@@ -16,6 +17,9 @@ enum ImportDiagnostics {
         return "NIC Music \(version)\niOS \(ProcessInfo.processInfo.operatingSystemVersionString)\n\(events)"
     }
     static func record(_ event: String) {
+        // Off by default. CI test IPAs explicitly opt in, including Release builds.
+        let setting = Bundle.main.object(forInfoDictionaryKey: "NICDiagnosticLoggingEnabled")
+        guard (setting as? Bool == true) || (setting as? String == "YES") else { return }
         lock.lock(); defer { lock.unlock() }
         guard let url = fileURL,
               let data = "\(Date().timeIntervalSince1970) \(event)\n".data(using: .utf8) else { return }
@@ -23,7 +27,9 @@ enum ImportDiagnostics {
             try? Data(old.suffix(32768)).write(to: url, options: .atomic)
         }
         if !FileManager.default.fileExists(atPath: url.path) {
-            FileManager.default.createFile(atPath: url.path, contents: nil)
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let header = "NIC Music \(version)\niOS \(ProcessInfo.processInfo.operatingSystemVersionString)\n"
+            FileManager.default.createFile(atPath: url.path, contents: header.data(using: .utf8))
         }
         guard let file = try? FileHandle(forWritingTo: url) else { return }
         defer { try? file.close() }

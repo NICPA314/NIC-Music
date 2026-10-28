@@ -41,3 +41,12 @@ Real-device file providers, background playback, remote controls, lyric synchron
 The upstream root LICENSE contains AGPL-3.0, while its package.json says GPL-3.0; preserve notices and resolve that inconsistency before distribution rather than replacing upstream terms.
 
 Animated cover art uses the 3:4 tall video in the player when available; the upper image fades into a blurred artwork background. iOS 26 system Now Playing receives the matching 3:4 or 1:1 animated-artwork variant with its actual first-frame preview. Unsupported ratios keep static lock-screen artwork. Actual lock-screen animation remains subject to system support, device settings and device verification. See https://developer.apple.com/documentation/mediaplayer/providing-animated-artwork-for-media-items .
+
+
+## Picker regression checks (0.2.2)
+
+The document picker is presented modally by an owning UIKit controller rather than embedded as a SwiftUI sheet root. File selections use import-copy mode; folder selections use open mode for recursive access. The handoff is delivered once, after dismissal. UI tests cover cancel/reopen, file import/playback, and folder import, using the Release configuration to match the test IPA's optimization settings. These changes are a candidate fix for the device-only missing-callback failure, not proof that ESign or the device file provider is working.
+
+CI test builds pass `NIC_DIAGNOSTIC_LOGGING=YES`, writing bounded logs to `Documents/Logs/NIC-Music.log`. Ordinary/formal builds default to `NIC_DIAGNOSTIC_LOGGING=NO`; there is no diagnostics UI. Version and source/license information live together in About.
+
+UI fixtures live in the separate simulator-only `NICImportFixtures` app. The picker reads another app's shared Documents container via On My iPhone, rather than selecting files already inside NIC Music. The helper has no dependency relationship with the shipping target.
