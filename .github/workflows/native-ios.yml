@@ -66,6 +66,7 @@ jobs:
           sleep 2
           xcrun simctl io "$DEVICE" screenshot build/library-dark.png
       - name: Verify import, metadata, album grouping, independent copies and playback
+        id: verify
         timeout-minutes: 15
         working-directory: native-ios
         run: |
@@ -90,7 +91,7 @@ jobs:
             xcrun simctl spawn "$DEVICE" log show --last 10m --style compact --predicate 'process == "NICMusic" OR (process == "com.apple.DocumentManagerUICore.DocumentManagerService" AND messageType == error)' > build-import-runtime.log 2>&1 || true
           fi
       - uses: actions/upload-artifact@v4
-        if: always() && steps.package.outcome == 'success'
+        if: always() && steps.package.outcome == 'success' && steps.verify.outcome == 'success'
         with:
           name: NIC-Music-iOS
           path: |
