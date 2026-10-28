@@ -47,7 +47,7 @@ jobs:
           unzip -t NIC-Music-0.2.0-Test-Unsigned.ipa
           shasum -a 256 *.ipa > SHA256.txt
       - name: Simulator launch proof
-        timeout-minutes: 8
+        timeout-minutes: 15
         working-directory: native-ios
         run: |
           set -euo pipefail
@@ -72,7 +72,16 @@ jobs:
           DEVICE=$(xcrun simctl list devices booted -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for v in d["devices"].values() for x in v if x["state"] == "Booted"))')
           xcrun simctl ui "$DEVICE" appearance light
           xcodebuild test -project NICMusic.xcodeproj -scheme NICMusic -destination "platform=iOS Simulator,id=$DEVICE" -parallel-testing-enabled NO -derivedDataPath build/simulator -resultBundlePath build/ImportTests.xcresult CODE_SIGNING_ALLOWED=NO > build-tests.log 2>&1 || { tail -150 build-tests.log; exit 1; }
+          xcrun simctl launch "$DEVICE" app.nicpa.amllplayer.test
+          sleep 3
           xcrun simctl io "$DEVICE" screenshot build/library-imported.png
+      - name: Export test screenshots
+        if: always()
+        working-directory: native-ios
+        run: |
+          if [ -d build/ImportTests.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/ImportTests.xcresult --output-path build/test-attachments || true
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: NIC-Music-iOS
@@ -85,7 +94,9 @@ jobs:
         if: always()
         with:
           name: Native-test-results
-          path: native-ios/build/ImportTests.xcresult
+          path: |
+            native-ios/build/ImportTests.xcresult
+            native-ios/build/test-attachments
           retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
