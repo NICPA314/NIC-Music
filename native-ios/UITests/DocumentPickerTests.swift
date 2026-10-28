@@ -15,7 +15,9 @@ final class DocumentPickerTests: XCTestCase {
         addButton.tap()
         app.buttons["选择音乐文件"].tap()
         let browse = app.buttons["Browse"].firstMatch
-        if browse.waitForExistence(timeout: 5) { browse.tap() }
+        // File-provider UI appears asynchronously on a freshly booted simulator.
+        // Do not skip Browse just because its remote view has not arrived yet.
+        XCTAssertTrue(browse.waitForExistence(timeout: 60)); browse.tap()
         print("PICKER AFTER BROWSE:\n" + app.debugDescription)
         let local = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "On My iPhone")).firstMatch
         if !local.waitForExistence(timeout: 5) {
@@ -29,18 +31,19 @@ final class DocumentPickerTests: XCTestCase {
         XCTAssertTrue(samples.waitForExistence(timeout: 10)); samples.tap()
         let file = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Wrong Filename")).firstMatch
         XCTAssertTrue(file.waitForExistence(timeout: 10)); file.tap()
-        for title in ["Open", "Done", "Import"] {
-            let finish = app.buttons[title].firstMatch
-            if finish.exists && finish.isHittable { finish.tap(); break }
-        }
+        let finish = app.buttons["Open"].firstMatch
+        XCTAssertTrue(finish.waitForExistence(timeout: 15))
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: finish)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 15), .completed)
+        finish.tap()
         let result = app.alerts["导入结果"]
         let receivedResult = result.waitForExistence(timeout: 45)
         if !receivedResult { print("IMPORT DID NOT COMPLETE:\n" + app.debugDescription) }
         XCTAssertTrue(receivedResult)
         XCTAssertTrue(result.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "已导入 1")).firstMatch.exists)
         result.buttons["好"].tap()
-        app.staticTexts["歌曲"].firstMatch.tap()
-        let title = app.staticTexts["Metadata Title"].firstMatch
+        app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "歌曲")).firstMatch.tap()
+        let title = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Metadata Title")).firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 10)); title.tap()
         let mini = app.buttons["mini-player"]
         XCTAssertTrue(mini.waitForExistence(timeout: 10)); mini.tap()

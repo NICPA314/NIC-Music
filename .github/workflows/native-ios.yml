@@ -36,6 +36,7 @@ jobs:
           xcodebuild build -project NICMusic.xcodeproj -scheme NICMusic -configuration Release -destination 'generic/platform=iOS' -derivedDataPath build/device CODE_SIGNING_ALLOWED=NO > build-device.log 2>&1 || { tail -100 build-device.log; exit 1; }
           xcodebuild build -project NICMusic.xcodeproj -scheme NICMusic -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build/simulator CODE_SIGNING_ALLOWED=NO > build-simulator.log 2>&1 || { tail -100 build-simulator.log; exit 1; }
       - name: Package
+        id: package
         working-directory: native-ios
         run: |
           set -euo pipefail
@@ -87,6 +88,7 @@ jobs:
             xcrun simctl spawn "$DEVICE" log show --last 10m --style compact --predicate 'process == "NICMusic" OR (process == "com.apple.DocumentManagerUICore.DocumentManagerService" AND messageType == error)' > build-import-runtime.log 2>&1 || true
           fi
       - uses: actions/upload-artifact@v4
+        if: always() && steps.package.outcome == 'success'
         with:
           name: NIC-Music-iOS
           path: |
