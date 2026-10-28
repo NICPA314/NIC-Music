@@ -18,6 +18,7 @@ struct LibraryRoot: View {
     @State private var playlistName = ""
     @State private var presented: Song?
     @State private var selectedTab = 0
+    @State private var showSettings = false
     @AppStorage("albumSort") private var albumSort = "name"
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -25,9 +26,10 @@ struct LibraryRoot: View {
                 NavigationStack {
                     libraryContent
                         .navigationTitle("资料库")
+                        .navigationDestination(isPresented: $showSettings) { settingsContent }
                         .toolbar {
                             ToolbarItem(placement: .topBarLeading) {
-                                NavigationLink { settingsContent } label: { Image(systemName: "gearshape").font(.title3).frame(width: 48, height: 48) }
+                                Button { showSettings = true } label: { Image(systemName: "gearshape").font(.title3).frame(width: 48, height: 48).contentShape(Circle()) }
                                     .buttonStyle(.plain).glassEffect(.clear.interactive(), in: .circle).accessibilityLabel("设置")
                             }.sharedBackgroundVisibility(.hidden)
                             ToolbarItem(placement: .topBarTrailing) { toolbarImportMenu }

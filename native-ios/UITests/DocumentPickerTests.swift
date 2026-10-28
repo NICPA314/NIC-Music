@@ -77,11 +77,12 @@ final class DocumentPickerTests: XCTestCase {
         if back.exists { back.tap() }
         let settings = app.buttons["设置"].firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 10)); settings.tap()
+        XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["AMLL Player 开源项目"].exists)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "导入文件夹可")).firstMatch.exists)
         XCTAssertFalse(app.buttons["复制导入诊断"].exists)
         XCTAssertFalse(app.staticTexts["导入"].exists)
-        XCTAssertTrue(app.staticTexts["0.2.2 (6)"].exists)
+        XCTAssertTrue(app.staticTexts["0.2.2 (6)"].waitForExistence(timeout: 10))
         let settingsImage = XCTAttachment(screenshot: app.screenshot())
         settingsImage.name = "settings-about-version"; settingsImage.lifetime = .keepAlways; add(settingsImage)
     }
