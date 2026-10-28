@@ -57,6 +57,7 @@ struct Song: Identifiable, Codable, Equatable {
     var playing = false
     var position: Double = 0
     var duration: Double = 0
+    var audioEnergy: Double = 0
     var importing = false
     var importProgress = ""
     var importSummary: String?
@@ -109,8 +110,16 @@ struct Song: Identifiable, Codable, Equatable {
         commands.nextTrackCommand.addTarget { [weak self] _ in Task { @MainActor in self?.next(1) }; return .success }
         commands.previousTrackCommand.addTarget { [weak self] _ in Task { @MainActor in self?.next(-1) }; return .success }
         NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.pause() } }
-        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
-            Task { @MainActor in guard let self, let player = self.player else { return }; self.position = player.currentTime }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, let player = self.player else { return }
+                self.position = player.currentTime
+                if self.playing {
+                    player.updateMeters()
+                    let amplitude = pow(10, Double(player.averagePower(forChannel: 0)) / 20)
+                    self.audioEnergy = self.audioEnergy * 0.65 + min(1, sqrt(amplitude)) * 0.35
+                } else { self.audioEnergy = 0 }
+            }
         }
     }
     func save() {
@@ -330,13 +339,14 @@ struct Song: Identifiable, Codable, Equatable {
             try session.setCategory(.playback, mode: .default)
             try session.setActive(true)
             let next = try AVAudioPlayer(contentsOf: folder.appendingPathComponent(song.filename))
+            next.isMeteringEnabled = true
             player?.stop(); player = next; next.delegate = self
             currentID = song.id; position = 0; duration = next.duration
             playing = next.play(); nowPlaying()
         } catch { self.error = "播放失败：\(error.localizedDescription)" }
     }
     func resume() { playing = player?.play() ?? false; nowPlaying() }
-    func pause() { player?.pause(); playing = false; nowPlaying() }
+    func pause() { player?.pause(); playing = false; audioEnergy = 0; nowPlaying() }
     func toggle() { playing ? pause() : resume() }
     func seek(_ seconds: Double) { player?.currentTime = min(max(seconds,0),duration); position = player?.currentTime ?? 0; nowPlaying() }
     func next(_ step: Int) { let ordered = queue; guard let i = ordered.firstIndex(where: { $0.id == currentID }), !ordered.isEmpty else { return }; play(ordered[(i+step+ordered.count)%ordered.count]) }

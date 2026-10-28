@@ -44,8 +44,8 @@ jobs:
           ditto build/device/Build/Products/Release-iphoneos/NICMusic.app build/package/Payload/NICMusic.app
           test -f build/package/Payload/NICMusic.app/dist/index.html
           cd build/package
-          zip -qry NIC-Music-0.2.1-build4-Test-Unsigned.ipa Payload
-          unzip -t NIC-Music-0.2.1-build4-Test-Unsigned.ipa
+          zip -qry NIC-Music-0.2.1-build5-Test-Unsigned.ipa Payload
+          unzip -t NIC-Music-0.2.1-build5-Test-Unsigned.ipa
           shasum -a 256 *.ipa > SHA256.txt
       - name: Simulator launch proof
         timeout-minutes: 15

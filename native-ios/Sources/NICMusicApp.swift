@@ -17,7 +17,6 @@ struct LibraryRoot: View {
     @State private var newPlaylist = false
     @State private var playlistName = ""
     @State private var presented: Song?
-    @State private var query = ""
     @State private var selectedTab = 0
     @State private var diagnosticsCopied = false
     @AppStorage("albumSort") private var albumSort = "name"
@@ -32,32 +31,22 @@ struct LibraryRoot: View {
                                 NavigationLink { settingsContent } label: { Image(systemName: "gearshape").font(.title3).frame(width: 48, height: 48) }
                                     .buttonStyle(.plain).glassEffect(.clear.interactive(), in: .circle).accessibilityLabel("设置")
                             }.sharedBackgroundVisibility(.hidden)
-                            ToolbarItem(placement: .topBarTrailing) { importMenu }
+                            ToolbarItem(placement: .topBarTrailing) { toolbarImportMenu }
                                 .sharedBackgroundVisibility(.hidden)
                         }
-                }
+                }.toolbar(.hidden, for: .tabBar)
             }
             Tab("搜索", systemImage: "magnifyingglass", value: 1) {
-                NavigationStack {
-                    songList(library.librarySongs.filter { query.isEmpty || ($0.title + $0.artist + ($0.album ?? "")).localizedCaseInsensitiveContains(query) })
-                        .navigationTitle("搜索")
-                        .safeAreaInset(edge: .top) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                                TextField("歌曲、艺人", text: $query).submitLabel(.search).accessibilityIdentifier("music-search-field")
-                                if !query.isEmpty { Button("清除", systemImage: "xmark.circle.fill") { query = "" }.labelStyle(.iconOnly).foregroundStyle(.secondary) }
-                            }.padding(16).glassEffect(.clear.interactive(), in: .capsule).padding(.horizontal, 20).padding(.bottom, 8)
-                        }
-                }
+                NavigationStack { MusicSearchView().navigationTitle("搜索") }.toolbar(.hidden, for: .tabBar)
             }
             Tab("播放列表", systemImage: "music.note.list", value: 3) {
-                NavigationStack { playlistList.navigationTitle("播放列表") }
+                NavigationStack { playlistList.navigationTitle("播放列表") }.toolbar(.hidden, for: .tabBar)
             }
             Tab("专辑", systemImage: "square.stack", value: 4) {
-                NavigationStack { albumGrid.navigationTitle("专辑") }
+                NavigationStack { albumGrid.navigationTitle("专辑") }.toolbar(.hidden, for: .tabBar)
             }
             Tab("歌手", systemImage: "person.crop.circle", value: 5) {
-                NavigationStack { ArtistDirectoryView().navigationTitle("歌手") }
+                NavigationStack { ArtistDirectoryView().navigationTitle("歌手") }.toolbar(.hidden, for: .tabBar)
             }
         }
         .toolbar(.hidden, for: .tabBar)
@@ -78,7 +67,7 @@ struct LibraryRoot: View {
     }
     private var settingsContent: some View {
         Form {
-            Section("音乐") { importMenu; LabeledContent("歌曲", value: "\(library.librarySongs.count)") }
+            Section("音乐") { LabeledContent("歌曲", value: "\(library.librarySongs.count)") }
             Section("导入") {
                 Text(library.importStatus).font(.subheadline)
                 Button(diagnosticsCopied ? "已复制诊断" : "复制导入诊断", systemImage: "doc.on.doc") {
@@ -126,6 +115,13 @@ struct LibraryRoot: View {
             Button("导入文件夹", systemImage: "folder") { startImport(folder: true) }
         } label: { Label("导入音乐", systemImage: "plus").labelStyle(.titleAndIcon).font(.headline).padding(.horizontal, 24).frame(minHeight: 56).contentShape(Capsule()) }
             .buttonStyle(.plain).glassEffect(.clear.interactive(), in: .capsule).disabled(library.importing).accessibilityIdentifier("import-music")
+    }
+    private var toolbarImportMenu: some View {
+        Menu {
+            Button("选择音乐文件", systemImage: "music.note") { startImport(folder: false) }
+            Button("导入文件夹", systemImage: "folder") { startImport(folder: true) }
+        } label: { Image(systemName: "plus").font(.title2).frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }
+            .buttonStyle(.plain).disabled(library.importing).accessibilityLabel("导入音乐").accessibilityIdentifier("import-music")
     }
     private func startImport(folder: Bool, playlistID: UUID? = nil) {
         let request = ImportRequest(folder: folder, playlistID: playlistID)
@@ -203,7 +199,12 @@ struct LibraryRoot: View {
         }
     }
     private var albumGrid: some View {
-        ScrollView {
+        Group {
+            if albums.isEmpty {
+                ContentUnavailableView { Label("暂无专辑", systemImage: "square.stack") } actions: {
+                    Button("导入文件夹", systemImage: "folder.badge.plus") { startImport(folder: true) }.buttonStyle(ClearGlassButtonStyle())
+                }
+            } else { ScrollView {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 22) {
                 ForEach(albums) { album in
                     NavigationLink { AlbumDetailView(albumKey: album.id) } label: {
@@ -211,12 +212,17 @@ struct LibraryRoot: View {
                     }.buttonStyle(.plain)
                 }
             }.padding(20)
+            } }
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Picker("排列方式", selection: $albumSort) { Text("名称").tag("name"); Text("时间").tag("date"); Text("歌手").tag("artist") }
                 } label: { Image(systemName: "arrow.up.arrow.down").frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }.buttonStyle(.plain).accessibilityLabel("专辑排列方式")
+            }.sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { startImport(folder: true) } label: { Image(systemName: "plus").font(.title2).frame(width: 48, height: 48).glassEffect(.clear.interactive(), in: .circle) }
+                    .buttonStyle(.plain).disabled(library.importing).accessibilityLabel("导入专辑文件夹")
             }.sharedBackgroundVisibility(.hidden)
         }
     }
@@ -247,7 +253,7 @@ struct LibraryRoot: View {
         .contextMenu { Button(playlist.pinned == true ? "取消置顶" : "置顶到资料库", systemImage: playlist.pinned == true ? "pin.slash" : "pin") { library.togglePlaylistPin(playlist.id) } }
     }
     private func libraryRow(_ title: String, icon: String) -> some View {
-        HStack { Image(systemName: icon).foregroundStyle(.pink).frame(width: 30); Text(title).foregroundStyle(.primary); Spacer(); Image(systemName: "chevron.right").font(.footnote.bold()).foregroundStyle(.tertiary) }.font(.title3).padding(.vertical, 16)
+        HStack { Image(systemName: icon).foregroundStyle(.pink).frame(width: 30); Text(title).foregroundStyle(.primary); Spacer(); Image(systemName: "chevron.right").font(.footnote.bold()).foregroundStyle(.tertiary) }.font(.title3).padding(.vertical, 16).contentShape(Rectangle())
     }
     private func tile(_ song: Song, title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {

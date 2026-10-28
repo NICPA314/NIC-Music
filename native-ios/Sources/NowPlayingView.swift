@@ -94,7 +94,12 @@ struct NowPlayingView: View {
             let size = canvas.size
             ZStack(alignment: .top) {
             Cover(song: song).frame(width: size.width, height: size.height).blur(radius: 65).scaleEffect(1.25)
-            Color.black.opacity(0.4)
+            LyricsView(song: song, position: 0, playing: library.playing && scenePhase == .active,
+                       backgroundOnly: true, audioEnergy: library.audioEnergy, reduceMotion: reduceMotion,
+                       onError: { _ in ImportDiagnostics.record("AMLL background unavailable; showing static artwork") })
+                .id(song.id.uuidString + (song.artworkFilename ?? ""))
+                .allowsHitTesting(false)
+            Color.black.opacity(0.35)
             if mode == 0, let filename = song.videoFilename {
                 LoopingCover(url: library.folder.appendingPathComponent(filename), active: library.playing && scenePhase == .active && !reduceMotion)
                     .frame(width: size.width, height: size.height * 0.72)

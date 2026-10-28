@@ -103,6 +103,11 @@ struct PlaylistDetailView: View {
                     if savingCover { ProgressView() }
                     if let first = songs.first {
                         Button("播放", systemImage: "play.fill") { library.play(first, queue: songs) }.buttonStyle(ClearGlassButtonStyle())
+                    } else {
+                        Menu {
+                            Button("选择音乐文件") { onImport(false) }
+                            Button("导入文件夹") { onImport(true) }
+                        } label: { Label("导入音乐", systemImage: "plus").font(.headline).padding(.horizontal, 24).frame(height: 56).glassEffect(.clear.interactive(), in: .capsule) }.buttonStyle(.plain)
                     }
                     LazyVStack(spacing: 0) {
                         ForEach(songs) { song in

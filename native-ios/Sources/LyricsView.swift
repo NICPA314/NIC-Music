@@ -5,6 +5,9 @@ struct LyricsView: UIViewRepresentable {
     let song: Song
     let position: Double
     let playing: Bool
+    var backgroundOnly = false
+    var audioEnergy = 0.0
+    var reduceMotion = false
     var showTranslation = true
     var showPronunciation = true
     var onCapabilities: (Bool, Bool) -> Void = { _, _ in }
@@ -27,6 +30,9 @@ struct LyricsView: UIViewRepresentable {
         context.coordinator.song = song
         context.coordinator.position = position
         context.coordinator.playing = playing
+        context.coordinator.backgroundOnly = backgroundOnly
+        context.coordinator.audioEnergy = audioEnergy
+        context.coordinator.reduceMotion = reduceMotion
         context.coordinator.showTranslation = showTranslation
         context.coordinator.showPronunciation = showPronunciation
         context.coordinator.onCapabilities = onCapabilities
@@ -43,6 +49,9 @@ struct LyricsView: UIViewRepresentable {
         var loaded: Song?
         var position: Double = 0
         var playing = false
+        var backgroundOnly = false
+        var audioEnergy = 0.0
+        var reduceMotion = false
         var showTranslation = true
         var showPronunciation = true
         var onCapabilities: ((Bool, Bool) -> Void)?
@@ -51,6 +60,7 @@ struct LyricsView: UIViewRepresentable {
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let body = message.body as? [String:Any] else { return }
             if body["event"] as? String == "ready" { ready = true; sync() }
+            if body["event"] as? String == "backgroundReady" { ImportDiagnostics.record("AMLL background ready") }
             if body["event"] as? String == "error" { onError?(body["message"] as? String ?? "歌词读取失败") }
             if body["event"] as? String == "loaded" { onCapabilities?(body["translation"] as? Bool ?? false, body["pronunciation"] as? Bool ?? false) }
         }
@@ -62,6 +72,18 @@ struct LyricsView: UIViewRepresentable {
         }
         func sync() {
             guard ready, let song, let web else { return }
+            if backgroundOnly {
+                if loaded != song {
+                    loaded = song; failed = false
+                    let artwork = song.artwork.map { data in
+                        let mime = data.starts(with: [0x89, 0x50, 0x4E, 0x47]) ? "image/png" : "image/jpeg"
+                        return "data:\(mime);base64," + data.base64EncodedString()
+                    } ?? ""
+                    web.callAsyncJavaScript("await window.setAmbientArtwork(artwork)", arguments: ["artwork": artwork], in: nil, in: .page, completionHandler: completed)
+                }
+                web.callAsyncJavaScript("window.setAmbientPlayback(active, energy, reduced)", arguments: ["active": playing, "energy": audioEnergy, "reduced": reduceMotion], in: nil, in: .page, completionHandler: completed)
+                return
+            }
             if loaded != song {
                 loaded = song
                 // Structured arguments keep lyric text out of executable JS source.
