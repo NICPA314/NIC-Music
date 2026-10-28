@@ -51,7 +51,7 @@ struct LibraryRoot: View {
             }
         }
 
-        .tabViewBottomAccessory { bottomDock }
+        .modifier(PlayerAccessory(enabled: library.current != nil, accessory: bottomDock))
         .sheet(item: $presented) { _ in NowPlayingView().environment(library).presentationDetents([.large]).presentationDragIndicator(.hidden) }
         .background {
             if let request = importRequest { DocumentImportPicker(types: request.folder ? [.folder] : [.audio], multiple: !request.folder) { urls in
@@ -262,5 +262,17 @@ struct Cover: View {
             if let data = song.artwork, let ui = UIImage(data: data) { Image(uiImage: ui).resizable().scaledToFill() }
             else { Rectangle().fill(LinearGradient(colors:[.pink.opacity(0.8),.purple.opacity(0.7)],startPoint:.topLeading,endPoint:.bottomTrailing)).overlay { Image(systemName:"music.note").font(.title).foregroundStyle(.white.opacity(0.85)) } }
         }.clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct PlayerAccessory<Accessory: View>: ViewModifier {
+    let enabled: Bool
+    let accessory: Accessory
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 26.1, *) {
+            content.tabViewBottomAccessory(isEnabled: enabled) { accessory }
+        } else if enabled {
+            content.tabViewBottomAccessory { accessory }
+        } else { content }
     }
 }
