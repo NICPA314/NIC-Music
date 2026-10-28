@@ -161,7 +161,7 @@ struct LibraryRoot: View {
                     if !recentAlbums.isEmpty { Text("最近添加").font(.title2.bold()) }
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 22) {
                         ForEach(recentAlbums) { album in
-                            NavigationLink { AlbumDetailView(albumKey: album.id) } label: { tile(album.first, title: album.first.albumTitle, subtitle: album.first.albumArtist ?? album.first.artist) }.buttonStyle(.plain)
+                            NavigationLink { AlbumDetailView(albumKey: album.id) } label: { tile(album.first, title: album.first.albumTitle, subtitle: album.first.albumArtist ?? album.first.artist) }.buttonStyle(.plain).contextMenu { AlbumContextActions(album: album) }
                         }
                     }
                 }.padding(20)
@@ -177,7 +177,7 @@ struct LibraryRoot: View {
                 ForEach(albums) { album in
                     NavigationLink { AlbumDetailView(albumKey: album.id) } label: {
                         tile(album.first, title: album.first.albumTitle, subtitle: album.first.albumArtist ?? album.first.artist)
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(.plain).contextMenu { AlbumContextActions(album: album) }
                 }
             }.padding(20)
             } }
@@ -245,7 +245,7 @@ struct LibraryRoot: View {
                                 Spacer(minLength: 0)
                                 if library.currentID == song.id { Image(systemName: "waveform").foregroundStyle(.pink) }
                             }.padding(.vertical, 4).contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.plain).contextMenu { SongContextActions(song: song, queue: songs) }
                     }
                 } header: { Text("歌曲 · \(songs.count)") }
             }.listStyle(.plain)

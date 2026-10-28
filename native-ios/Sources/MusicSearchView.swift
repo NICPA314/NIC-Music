@@ -87,7 +87,7 @@ private struct SearchTrackRow: View {
                 Spacer()
                 if song.id == library.currentID { Image(systemName: "waveform").foregroundStyle(.pink) }
             }.padding(.vertical, 5).contentShape(Rectangle())
-        }.buttonStyle(.plain)
+        }.buttonStyle(.plain).contextMenu { SongContextActions(song: song, queue: queue) }
     }
 }
 
