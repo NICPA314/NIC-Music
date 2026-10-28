@@ -84,7 +84,9 @@ jobs:
           set -euo pipefail
           DEVICE=$(xcrun simctl list devices booted -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for v in d["devices"].values() for x in v if x["state"] == "Booted"))')
           xcrun simctl ui "$DEVICE" appearance light
-          xcodebuild test -project NICMusic.xcodeproj -scheme NICMusic -configuration Release -destination "platform=iOS Simulator,id=$DEVICE" -parallel-testing-enabled NO -derivedDataPath build/simulator -resultBundlePath build/ImportTests.xcresult CODE_SIGNING_ALLOWED=NO NIC_DIAGNOSTIC_LOGGING=YES ENABLE_TESTABILITY=YES > build-tests.log 2>&1 || { tail -150 build-tests.log; exit 1; }
+          # Keep both attempts in xcresult when a simulator launch times out.
+          # At most one retry; persistent failures still block IPA publication.
+          xcodebuild test -project NICMusic.xcodeproj -scheme NICMusic -configuration Release -destination "platform=iOS Simulator,id=$DEVICE" -parallel-testing-enabled NO -retry-tests-on-failure -test-iterations 2 -derivedDataPath build/simulator -resultBundlePath build/ImportTests.xcresult CODE_SIGNING_ALLOWED=NO NIC_DIAGNOSTIC_LOGGING=YES ENABLE_TESTABILITY=YES > build-tests.log 2>&1 || { tail -150 build-tests.log; exit 1; }
           APP_DATA=$(xcrun simctl get_app_container "$DEVICE" app.nicpa.amllplayer.test data)
           grep -q 'picker presented by UIKit, delegate retained=true' "$APP_DATA/Documents/Logs/NIC-Music.log"
           grep -q 'AMLL background ready' "$APP_DATA/Documents/Logs/NIC-Music.log"

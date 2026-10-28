@@ -39,7 +39,12 @@ import UIKit
         try FileManager.default.removeItem(at: source)
         library.play(song)
         XCTAssertTrue(library.playing, library.error ?? "")
-        try await Task.sleep(for: .milliseconds(700))
+        // Simulator audio startup and the main run loop can lag on CI. Wait
+        // for observable playback, with a deadline, instead of assuming 700 ms.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while (library.position <= 0.1 || library.audioEnergy <= 0), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
         XCTAssertGreaterThan(library.position, 0.1)
         XCTAssertGreaterThan(library.audioEnergy, 0)
         library.pause()
